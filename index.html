@@ -99,11 +99,34 @@
   .cm .ced { background:rgba(31,111,235,.10); border-radius:10px; padding:10px; }
   .cm .ced textarea { min-height:80px; background:var(--card); }
   .cm .eb { display:flex; gap:8px; margin-top:8px; }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .tile { background:var(--bg); border-radius:10px; padding:8px 10px; }
+  .tile .n { font-size:20px; font-weight:600; }
+  .tile .l { font-size:12px; color:var(--mut); }
+  .flts { display:flex; gap:6px; margin-top:10px; }
+  button.flt { padding:5px 12px; font-size:13px; border-radius:8px; background:transparent; color:var(--mut); border:1px solid var(--line); }
+  button.flt.on { background:rgba(31,111,235,.12); color:var(--pri); border-color:var(--pri); }
+  .task .t small { display:block; }
+  .task .t .lc { display:block; color:var(--mut); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .task .t .crr { display:block; color:var(--warn); font-size:13px; }
+  .warnbar { background:rgba(224,138,0,.14); border:1px solid rgba(224,138,0,.45); border-radius:14px; padding:12px; margin-bottom:12px; }
+  .warnbar b { color:var(--warn); }
+  .warnbar .s { font-size:13px; color:var(--warn); margin-top:2px; overflow-wrap:anywhere; }
+  .sumc { background:rgba(224,138,0,.14); color:var(--warn); border-radius:10px; padding:8px 10px; font-size:13px; margin-bottom:12px; }
+  .tl { padding-left:14px; border-left:2px solid var(--line); margin-left:4px; }
+  .ev { position:relative; padding:0 0 12px 8px; }
+  .ev:last-child { padding-bottom:0; }
+  .ev::before { content:""; position:absolute; left:-20px; top:6px; width:10px; height:10px; border-radius:50%; background:var(--mut); }
+  .ev.m::before { background:var(--warn); }
+  .ev.d::before { background:var(--ok); }
+  .ev .w { font-size:12px; color:var(--mut); }
 </style>
 </head>
 <body>
 <main id="home">
   <h1>Plan zilnic <span class="hr"><button class="chip n" id="syncChip">Fără sincronizare</button><button class="ghost" id="notifBtn">🔔 Activează</button></span></h1>
+
+  <div id="leftBanner"></div>
 
   <div class="card">
     <div class="daybar">
@@ -119,6 +142,13 @@
     <div class="meter">
       <div class="lbl"><span>Lucrat (cronometru)</span><span id="workedTxt"></span></div>
       <div class="bar" id="workedBar"><i></i></div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="n" id="tDone"></div><div class="l">terminate</div></div>
+      <div class="tile"><div class="n" id="tPast"></div><div class="l" id="tPastL"></div></div>
+    </div>
+    <div class="flts" id="flts">
+      <button class="flt on" data-f="all">Toate</button><button class="flt" data-f="past">Din trecut</button><button class="flt" data-f="new">Noi</button>
     </div>
   </div>
 
@@ -198,6 +228,12 @@
     </div>
 
     <div class="card">
+      <h3 style="margin-top:0">Istoric</h3>
+      <div id="dSum"></div>
+      <div class="tl" id="dHist"></div>
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0">Comentarii</h3>
       <textarea id="cNew" placeholder="Scrie un comentariu…" style="min-height:70px"></textarea>
       <div class="row" style="margin-top:8px"><button id="cAdd">Adaugă</button><span class="err" id="cErr"></span></div>
@@ -248,6 +284,10 @@
       }
       delete t.workedSec; delete t.startedAt;
       t.estMin = t.estMin || 0;
+      if (!t.created) { const c = parseInt(String(t.id).slice(0, 8), 36); t.created = (c > 1.5e12 && c < 4e12) ? c : t.u; }   // id-ul începe cu ora creării
+      if (!t.orig) t.orig = t.date;
+      if (!Array.isArray(t.moves)) t.moves = [];
+      if (t.doneAt === undefined) t.doneAt = null;
       if (!Array.isArray(t.comments)) t.comments = [];
       if (t.notes && String(t.notes).trim()) {       // vechea notiță devine primul comentariu (id fix, ca să nu se dubleze între dispozitive)
         const nid = 'n-' + t.id;
@@ -281,6 +321,7 @@
 
   let curDay = ymd(new Date());
   let openId = null; // task deschis în detalii
+  let filter = 'all'; // filtru listă: all | past | new
 
   // ---- timp ----
   const fmtMin = m => { m = Math.round(m); const h = Math.floor(m/60), r = m%60; return h ? `${h}h ${pad(r)}m` : `${r}m`; };
@@ -296,6 +337,18 @@
   const fromLocalInput = v => { const ms = new Date(v).getTime(); return isNaN(ms) ? null : ms; };
   const dayShort = ['D', 'L', 'Ma', 'Mi', 'J', 'V', 'S'];
   const fmtDay = d => { const x = new Date(d + 'T12:00:00'); return `${pad(x.getDate())}.${pad(x.getMonth()+1)}`; };
+
+  // ---- taskuri mutate pe alte zile ----
+  const daysBetween = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 864e5);
+  const agoTxt = n => n === 1 ? 'acum o zi' : `acum ${n} zile`;
+  const fmtShort = k => { const d = new Date(k + 'T12:00:00'); return `${d.getDate()} ${MON[d.getMonth()]}`; };
+  const isCarried = t => !!t.orig && t.orig < t.date;
+  const carriedLabel = t => `↪ din ${fmtShort(t.orig)} · ${agoTxt(daysBetween(t.orig, t.date))}` + (t.moves.length >= 2 ? ` · mutat ${t.moves.length}×` : '');
+  function moveTask(t, nd) { if (!nd || nd === t.date) return; t.moves.push({ from: t.date, to: nd, at: Date.now() }); t.date = nd; }
+  function setDone(t, v) { t.done = !!v; t.doneAt = v ? Date.now() : null; if (v) stopTask(t); }
+  const newTask = (title, estMin, date, comments) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [] });
+  // taskuri nefinalizate rămase pe zile trecute, cele mai vechi primele
+  const leftovers = () => { const today = ymd(new Date()); return state.tasks.filter(t => !t.done && t.date < today).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.created || 0) - (b.created || 0)); };
 
   function stopAll() {
     const now = Date.now();
@@ -344,6 +397,16 @@
       notify('Ai lucrat ' + lh + ' ore azi', 'Timpul lucrat a atins ' + fmtMin(workedMin(today)) + '. Ia o pauză.', 'worked-' + today);
     }
   }
+  // O singură notificare pe zi pentru taskurile rămase din zile trecute; așteaptă prima sincronizare ca să nu se dubleze între dispozitive.
+  function checkLeftover() {
+    if (!syncedOnce) return;
+    const L = leftovers(); if (!L.length) return;
+    const today = ymd(new Date()), n = state.notified[today] || (state.notified[today] = {});
+    if (n.leftover) return;
+    n.leftover = true; save();
+    notify(L.length === 1 ? '1 task rămas din zile trecute' : L.length + ' taskuri rămase din zile trecute',
+           'Cel mai vechi e din ' + fmtShort(L[0].date) + '. Deschide aplicația ca să le muți pe azi sau să le termini.', 'leftover-' + today);
+  }
 
   // ---- randare listă ----
   function setBar(id, v) {
@@ -376,9 +439,15 @@
     $('day').value = curDay;
     $('limit').value = state.limitHours;
     const list = $('list');
-    const ts = dayTasks(curDay);
+    const all = dayTasks(curDay);
+    const carried = all.filter(isCarried), carriedDone = carried.filter(t => t.done).length;
+    $('tDone').textContent = `${all.filter(t => t.done).length} / ${all.length}`;
+    $('tPast').textContent = carried.length;
+    $('tPastL').textContent = 'din zilele trecute' + (carried.length ? ` (${carriedDone} ${carriedDone === 1 ? 'terminat' : 'terminate'})` : '');
+    for (const b of document.querySelectorAll('#flts .flt')) b.classList.toggle('on', b.dataset.f === filter);
+    const ts = filter === 'past' ? carried : filter === 'new' ? all.filter(t => !isCarried(t)) : all;
     list.innerHTML = '';
-    if (!ts.length) list.innerHTML = '<div class="empty">Niciun task pentru această zi.</div>';
+    if (!ts.length) list.innerHTML = `<div class="empty">${all.length ? 'Niciun task în această categorie.' : 'Niciun task pentru această zi.'}</div>`;
     for (const t of ts) {
       const el = document.createElement('div');
       el.className = 'task' + (t.done ? ' done' : '');
@@ -388,13 +457,23 @@
         <input type="checkbox" ${t.done ? 'checked' : ''} aria-label="Gata">
         <div class="t"><b></b><small><span class="w">${fmtSec(workedSec(t))}</span> / ${fmtMin(t.estMin)}</small></div>
         <button class="play ${run ? 'on' : ''}" aria-label="${run ? 'Pauză' : 'Start'}">${run ? '⏸' : '▶'}</button>`;
-      const nc = visComments(t).length;
-      el.querySelector('b').textContent = t.title + (nc ? ' 💬 ' + nc : '');
+      const box = el.querySelector('.t');
+      box.querySelector('b').textContent = t.title;
+      const vc = visComments(t);
+      if (vc.length) { const s = document.createElement('span'); s.className = 'lc'; s.textContent = `💬 ${vc.length} · ${vc[0].txt.replace(/\s+/g, ' ')}`; box.appendChild(s); }
+      if (isCarried(t)) { const s = document.createElement('span'); s.className = 'crr'; s.textContent = carriedLabel(t); box.appendChild(s); }
       list.appendChild(el);
     }
-    const undone = ts.filter(t => !t.done).length;
+    const undone = all.filter(t => !t.done).length;
     $('carryWrap').innerHTML = undone ? '<button class="sec" id="carry" style="width:100%;margin-bottom:12px">Mută cele nefinalizate pe ziua următoare</button>' : '';
-    renderMeters(); renderWeek();
+    renderMeters(); renderWeek(); renderBanner();
+  }
+  function renderBanner() {
+    const el = $('leftBanner'), L = curDay === ymd(new Date()) ? leftovers() : [];
+    if (!L.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="warnbar"><b></b><div class="s"></div><div class="row" style="margin-top:8px"><button id="lbMove">Mută pe azi</button><button class="sec" id="lbSee">Vezi</button></div></div>';
+    el.querySelector('b').textContent = (L.length === 1 ? '1 task nefinalizat' : L.length + ' taskuri nefinalizate') + ' din zile trecute';
+    el.querySelector('.s').textContent = `Cel mai vechi: ${fmtShort(L[0].date)} · ${L[0].title}`;
   }
 
   // ---- detalii task ----
@@ -427,10 +506,28 @@
     p.textContent = run ? '⏸ Pauză' : '▶ Start'; p.classList.toggle('on', run);
     $('dDone').checked = !!t.done;
     $('dTot').textContent = fmtSec(workedSec(t));
+    renderHist(t);
     if (withSessions) renderSessions();
     else for (const el of document.querySelectorAll('#dSess .sess')) {      // doar durata sesiunii în curs
       const x = t.sessions[+el.dataset.i]; if (x && x.e == null) el.querySelector('.dur').textContent = fmtSec(sessSec(x));
     }
+  }
+  function renderHist(t) {
+    const sum = $('dSum');
+    if (isCarried(t)) {
+      const n = t.moves.length;
+      sum.className = 'sumc';
+      sum.textContent = `Planificat inițial pe ${fmtShort(t.orig)} · ${agoTxt(daysBetween(t.orig, t.date))}` + (n === 1 ? ' · mutat o dată' : n > 1 ? ` · mutat de ${n} ori` : '');
+    } else { sum.className = ''; sum.textContent = ''; }
+    const ev = [{ k: 'c', at: t.created || t.u, html: `<b>Creat</b> pentru ${fmtShort(t.orig || t.date)}` }];
+    for (const m of t.moves) ev.push({ k: 'm', at: m.at, html: `<b>Mutat</b> ${fmtShort(m.from)} → ${fmtShort(m.to)}` });
+    if (t.done && t.doneAt) {
+      const n = daysBetween(t.orig || t.date, ymd(new Date(t.doneAt)));
+      ev.push({ k: 'd', at: t.doneAt, html: `<b>Terminat</b> ${n <= 0 ? 'în aceeași zi' : 'după ' + (n === 1 ? 'o zi' : n + ' zile')}` });
+    }
+    ev.sort((a, b) => a.at - b.at);
+    const box = $('dHist'); box.innerHTML = '';
+    for (const e of ev) { const d = document.createElement('div'); d.className = 'ev ' + e.k; d.innerHTML = `${e.html}<div class="w">${fmtStamp(e.at)}</div>`; box.appendChild(d); }
   }
   const fmtHM = ms => { const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
   const dayLabel = (ms, taskDate) => {
@@ -520,14 +617,14 @@
     save(); renderDetail(false); checkThresholds(t.date);
   };
   $('dH').oninput = onEst; $('dM').oninput = onEst;
-  $('dDate').onchange = e => { const t = cur(); if (t && e.target.value) { t.date = e.target.value; save(); checkThresholds(t.date); } };
+  $('dDate').onchange = e => { const t = cur(); if (t && e.target.value) { moveTask(t, e.target.value); save(); renderDetail(false); checkThresholds(t.date); } };
   $('dTomorrow').onclick = () => {
     const t = cur(); if (!t) return;
     const d = new Date(t.date + 'T12:00:00'); d.setDate(d.getDate() + 1);
-    t.date = ymd(d); $('dDate').value = t.date; save(); checkThresholds(t.date);
+    moveTask(t, ymd(d)); $('dDate').value = t.date; save(); renderDetail(false); checkThresholds(t.date);
   };
   $('dPlay').onclick = () => { const t = cur(); if (!t) return; isRunning(t) ? stopTask(t) : startTask(t); save(); renderDetail(true); checkThresholds(); };
-  $('dDone').onchange = e => { const t = cur(); if (!t) return; t.done = e.target.checked; if (t.done) stopTask(t); save(); renderDetail(true); };
+  $('dDone').onchange = e => { const t = cur(); if (!t) return; setDone(t, e.target.checked); save(); renderDetail(true); };
   $('dDel').onclick = () => {
     const t = cur(); if (!t || !confirm('Ștergi task-ul?')) return;
     state.tasks = state.tasks.filter(x => x !== t); state.deleted[t.id] = Date.now(); save(); closeDetail();
@@ -535,8 +632,7 @@
   };
   $('dDup').onclick = () => {
     const t = cur(); if (!t) return;
-    state.tasks.push({ id: uid(), title: t.title + ' (copie)', estMin: t.estMin, date: t.date, done: false,
-      comments: JSON.parse(JSON.stringify(visComments(t))), sessions: [] });
+    state.tasks.push(newTask(t.title + ' (copie)', t.estMin, t.date, JSON.parse(JSON.stringify(visComments(t)))));
     save(); checkThresholds(t.date); $('dErr').textContent = 'Task duplicat pe aceeași zi.';
   };
   $('dAddSess').onclick = () => {
@@ -579,7 +675,7 @@
     const title = $('title').value.trim();
     const est = (parseInt($('h').value) || 0) * 60 + (parseInt($('m').value) || 0);
     if (!title) return;
-    state.tasks.push({ id: uid(), title, estMin: est, date: curDay, done: false, comments: [], sessions: [] });
+    state.tasks.push(newTask(title, est, curDay));
     $('title').value = '';
     save(); render(); checkThresholds(curDay);
   };
@@ -589,7 +685,7 @@
     if (e.target.closest('.play')) {
       isRunning(t) ? stopTask(t) : startTask(t);
     } else if (e.target.type === 'checkbox') {
-      t.done = e.target.checked; if (t.done) stopTask(t);
+      setDone(t, e.target.checked);
     } else { openDetail(t.id); return; }
     save(); render(); checkThresholds();
   };
@@ -597,8 +693,14 @@
     if (!e.target.closest('#carry')) return;
     const d = new Date(curDay + 'T12:00:00'); d.setDate(d.getDate() + 1);
     const nd = ymd(d);
-    for (const t of dayTasks(curDay)) if (!t.done) { stopTask(t); t.date = nd; }
+    for (const t of dayTasks(curDay)) if (!t.done) { stopTask(t); moveTask(t, nd); }
     save(); render(); checkThresholds(nd);
+  };
+  $('flts').onclick = e => { const b = e.target.closest('.flt'); if (b) { filter = b.dataset.f; render(); } };
+  $('leftBanner').onclick = e => {
+    const today = ymd(new Date()), L = leftovers();
+    if (e.target.closest('#lbMove')) { for (const t of L) { stopTask(t); moveTask(t, today); } save(); render(); checkThresholds(today); }
+    else if (e.target.closest('#lbSee') && L.length) { curDay = L[0].date; render(); }
   };
   const shift = n => { const d = new Date(curDay + 'T12:00:00'); d.setDate(d.getDate() + n); curDay = ymd(d); render(); };
   $('prev').onclick = () => shift(-1);
@@ -638,12 +740,14 @@
   let cfg = null;
   try { cfg = JSON.parse(localStorage.getItem(SKEY)); } catch (e) {}
   if (!(cfg && cfg.repo && cfg.token)) cfg = null;
+  let syncedOnce = !cfg;
   let lastSync = (cfg && cfg.last) || 0, syncing = false, again = false, syncTimer = null, syncState = cfg ? 'idle' : 'off', toastTimer = null;
 
   const enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(bin); };
   const dec = b => { const bin = atob(b.replace(/\s/g, '')); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); };
   const stable = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
-  const cleanNotified = n => { const o = {}; for (const d in (n || {})) if (n[d] && (n[d].planned || n[d].worked)) o[d] = n[d]; return o; };
+  const NKEYS = ['planned', 'worked', 'leftover'];
+  const cleanNotified = n => { const o = {}; for (const d in (n || {})) if (n[d] && NKEYS.some(k => n[d][k])) o[d] = n[d]; return o; };
   const canon = d => stable({ tasks: [...d.tasks].sort((a, b) => a.id < b.id ? -1 : 1), deleted: d.deleted, limitHours: d.limitHours, limitU: d.limitU || 0, notified: cleanNotified(d.notified) });
   const localDoc = () => ({ tasks: state.tasks, deleted: state.deleted, limitHours: state.limitHours, limitU: state.limitU, notified: state.notified });
   function normRemote(d) {
@@ -678,8 +782,7 @@
     else {
       const ln = cleanNotified(L.notified), rn = cleanNotified(R.notified);
       for (const d of new Set([...Object.keys(ln), ...Object.keys(rn)])) {
-        const o = {}; if ((ln[d] && ln[d].planned) || (rn[d] && rn[d].planned)) o.planned = true;
-        if ((ln[d] && ln[d].worked) || (rn[d] && rn[d].worked)) o.worked = true; notified[d] = o;
+        const o = {}; for (const k of NKEYS) if ((ln[d] && ln[d][k]) || (rn[d] && rn[d][k])) o[k] = true; notified[d] = o;
       }
     }
     tasks.sort((a, b) => a.id < b.id ? -1 : 1);       // aceeași ordine pe toate dispozitivele (id-ul începe cu ora creării)
@@ -771,7 +874,7 @@
       setSync(e && e.auth ? 'auth' : (e instanceof TypeError ? 'offline' : 'error'));
       if (totalChanges) refreshUI(openChanged);
     } finally {
-      syncing = false;
+      syncing = false; syncedOnce = true; checkLeftover();
       if (again) { again = false; scheduleSync(500); }
     }
   }
@@ -814,7 +917,7 @@
     }
     renderMeters();
     if (!$('detail').hidden) renderDetail(false);
-    checkThresholds();
+    checkThresholds(); checkLeftover(); renderBanner();
   }
   setInterval(tick, 15000);
   setInterval(() => { if (!document.hidden) sync(); }, 60000);
@@ -829,7 +932,8 @@
   setSync(cfg ? 'idle' : 'off');
   if (cfg) $('syRepo').value = cfg.repo;
   checkThresholds();
-  persist();                 // salvează migrarea (câmpurile noi), fără să marcheze task-uri ca modificate
+  persist();
+  checkLeftover();                 // salvează migrarea (câmpurile noi), fără să marcheze task-uri ca modificate
   if (cfg) sync();
 })();
 </script>
