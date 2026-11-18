@@ -135,6 +135,18 @@
   .rlg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
   .rit { display:flex; justify-content:space-between; gap:8px; font-size:13px; padding:6px 0; border-top:1px solid var(--line); }
   .rit span:last-child { color:var(--txt); white-space:nowrap; }
+  .zone { border-top:4px solid var(--zc); }
+  .zh { display:flex; align-items:center; margin-bottom:2px; }
+  .zh b { font-size:15px; font-weight:600; }
+  .zh .s { margin-left:auto; font-size:12px; color:var(--txt); }
+  .catsel { display:flex; gap:6px; margin-top:8px; }
+  .catsel button { flex:1; height:40px; padding:0; border-radius:10px; font-size:13px; background:var(--card); color:var(--txt); border:1px solid var(--line); }
+  .catsel button.on { border:1.5px solid var(--pri); background:rgba(31,111,235,.12); color:var(--pri); font-weight:500; }
+  .rmm { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px; }
+  .rmm div { background:var(--bg); border-radius:10px; padding:6px 8px; }
+  .rmm b { font-size:16px; font-weight:600; display:block; }
+  .rmm span { font-size:11px; color:var(--txt); }
+  .rh { font-size:12px; font-weight:600; margin:2px 4px 8px; }
 </style>
 </head>
 <body>
@@ -170,6 +182,7 @@
   <div class="card">
     <form id="form">
       <input type="text" id="title" placeholder="Task nou…" required autocomplete="off">
+      <div class="catsel" id="catSel"><button type="button" data-c="u">Urgent</button><button type="button" data-c="i">Important</button><button type="button" data-c="o">Opțional</button></div>
       <div class="row" style="margin-top:8px">
         <input type="number" id="h" min="0" max="24" placeholder="ore" inputmode="numeric" value="0">
         <span>h</span>
@@ -180,7 +193,7 @@
     </form>
   </div>
 
-  <div class="card" id="list"></div>
+  <div id="list"></div>
   <div id="carryWrap"></div>
 
   <div class="card">
@@ -222,6 +235,7 @@
       <div class="rnav"><button class="sec" id="rPrev" aria-label="Perioada anterioară">‹</button><b id="rLbl"></b><button class="sec" id="rNext" aria-label="Perioada următoare">›</button></div>
       <div id="rBody"></div>
     </div>
+    <div id="rCats"></div>
   </main>
 </div>
 
@@ -245,6 +259,8 @@
         <input type="date" id="dDate">
         <button class="sec" id="dTomorrow">Mâine</button>
       </div>
+      <div class="small" style="color:var(--mut);margin-top:10px">Prioritate</div>
+      <div class="catsel" id="dCat"><button type="button" data-c="u">Urgent</button><button type="button" data-c="i">Important</button><button type="button" data-c="o">Opțional</button></div>
       <div class="meter">
         <div class="lbl"><span>Lucrat / estimat</span><span id="dTxt"></span></div>
         <div class="bar" id="dBar"><i></i></div>
@@ -315,6 +331,7 @@
       if (!t.created) { const c = parseInt(String(t.id).slice(0, 8), 36); t.created = (c > 1.5e12 && c < 4e12) ? c : t.u; }   // id-ul începe cu ora creării
       if (!t.orig) t.orig = t.date;
       if (!Array.isArray(t.moves)) t.moves = [];
+      if (!['u', 'i', 'o'].includes(t.cat)) t.cat = 'i';
       if (t.doneAt === undefined) t.doneAt = null;
       if (!Array.isArray(t.comments)) t.comments = [];
       if (t.notes && String(t.notes).trim()) {       // vechea notiță devine primul comentariu (id fix, ca să nu se dubleze între dispozitive)
@@ -374,7 +391,8 @@
   const carriedLabel = t => `↪ din ${fmtShort(t.orig)} · ${agoTxt(daysBetween(t.orig, t.date))}` + (t.moves.length >= 2 ? ` · mutat ${t.moves.length}×` : '');
   function moveTask(t, nd) { if (!nd || nd === t.date) return; t.moves.push({ from: t.date, to: nd, at: Date.now() }); t.date = nd; }
   function setDone(t, v) { t.done = !!v; t.doneAt = v ? Date.now() : null; if (v) stopTask(t); }
-  const newTask = (title, estMin, date, comments) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [] });
+  const CATS = [{ k: 'u', name: 'Urgent', color: '#F7C1C1' }, { k: 'i', name: 'Important', color: '#FAC775' }, { k: 'o', name: 'Opțional', color: '#C0DD97' }];
+  const newTask = (title, estMin, date, comments, cat) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [], cat: cat || 'i' });
   // taskuri nefinalizate rămase pe zile trecute, cele mai vechi primele
   const leftovers = () => { const today = ymd(new Date()); return state.tasks.filter(t => !t.done && t.date < today).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.created || 0) - (b.created || 0)); };
 
@@ -477,22 +495,29 @@
     for (const b of document.querySelectorAll('#flts .flt')) b.classList.toggle('on', b.dataset.f === filter);
     const ts = filter === 'past' ? carried : filter === 'new' ? all.filter(t => !isCarried(t)) : filter === 'open' ? all.filter(t => !t.done) : filter === 'done' ? all.filter(t => t.done) : all;
     list.innerHTML = '';
-    if (!ts.length) list.innerHTML = `<div class="empty">${all.length ? 'Niciun task în această categorie.' : 'Niciun task pentru această zi.'}</div>`;
-    for (const t of ts) {
-      const el = document.createElement('div');
-      el.className = 'task' + (t.done ? ' done' : '');
-      el.dataset.id = t.id;
-      const run = isRunning(t);
-      el.innerHTML = `
-        <input type="checkbox" ${t.done ? 'checked' : ''} aria-label="Gata">
-        <div class="t"><b></b><small><span class="w">${fmtSec(workedSec(t))}</span> / ${fmtMin(t.estMin)}</small></div>
-        <button class="play ${run ? 'on' : ''}" aria-label="${run ? 'Pauză' : 'Start'}">${run ? '⏸' : '▶'}</button>`;
-      const box = el.querySelector('.t');
-      box.querySelector('b').textContent = t.title;
-      const vc = visComments(t);
-      if (vc.length) { const s = document.createElement('span'); s.className = 'lc'; s.textContent = `💬 ${vc.length} · ${vc[0].txt.replace(/\s+/g, ' ')}`; box.appendChild(s); }
-      if (isCarried(t)) { const s = document.createElement('span'); s.className = 'crr'; s.textContent = carriedLabel(t); box.appendChild(s); }
-      list.appendChild(el);
+    if (!ts.length) list.innerHTML = `<div class="card"><div class="empty">${all.length ? 'Niciun task în această categorie.' : 'Niciun task pentru această zi.'}</div></div>`;
+    for (const c of CATS) {
+      const zt = ts.filter(t => t.cat === c.k); if (!zt.length) continue;
+      const ac = all.filter(t => t.cat === c.k);
+      const zone = document.createElement('div'); zone.className = 'card zone'; zone.style.setProperty('--zc', c.color);
+      zone.innerHTML = `<div class="zh"><b>${c.name}</b><span class="s">${ac.filter(t => t.done).length} / ${ac.length} · ${fmtMin(ac.reduce((x, t) => x + t.estMin, 0))}</span></div>`;
+      for (const t of zt) {
+        const el = document.createElement('div');
+        el.className = 'task' + (t.done ? ' done' : '');
+        el.dataset.id = t.id;
+        const run = isRunning(t);
+        el.innerHTML = `
+          <input type="checkbox" ${t.done ? 'checked' : ''} aria-label="Gata">
+          <div class="t"><b></b><small><span class="w">${fmtSec(workedSec(t))}</span> / ${fmtMin(t.estMin)}</small></div>
+          <button class="play ${run ? 'on' : ''}" aria-label="${run ? 'Pauză' : 'Start'}">${run ? '⏸' : '▶'}</button>`;
+        const box = el.querySelector('.t');
+        box.querySelector('b').textContent = t.title;
+        const vc = visComments(t);
+        if (vc.length) { const s = document.createElement('span'); s.className = 'lc'; s.textContent = `💬 ${vc.length} · ${vc[0].txt.replace(/\s+/g, ' ')}`; box.appendChild(s); }
+        if (isCarried(t)) { const s = document.createElement('span'); s.className = 'crr'; s.textContent = carriedLabel(t); box.appendChild(s); }
+        zone.appendChild(el);
+      }
+      list.appendChild(zone);
     }
     const undone = all.filter(t => !t.done).length;
     $('carryWrap').innerHTML = undone ? '<button class="sec" id="carry" style="width:100%;margin-bottom:12px">Mută cele nefinalizate pe ziua următoare</button>' : '';
@@ -553,8 +578,8 @@
     repRef = ymd(d);
   }
   // taskurile sunt grupate după data planificată inițial (orig)
-  function repStats(a, b) {
-    const ts = state.tasks.filter(t => t.orig >= a && t.orig <= b), n = ts.length;
+  function repStats(a, b, cat) {
+    const ts = state.tasks.filter(t => t.orig >= a && t.orig <= b && (!cat || t.cat === cat)), n = ts.length;
     if (!n) return { n: 0 };
     const done = ts.filter(t => t.done);
     const same = done.filter(t => t.doneAt && ymd(new Date(t.doneAt)) <= t.orig).length;
@@ -585,7 +610,8 @@
     const dp = new Date(a + 'T12:00:00'); dp.setDate(dp.getDate() - 1);
     const [pa, pb] = repRange(repMode, ymd(dp));
     const s = repStats(a, b), p = repStats(pa, pb), body = $('rBody');
-    if (!s.n) { body.innerHTML = '<div class="empty">Niciun task planificat în această perioadă.</div>'; return; }
+    renderRepCats(a, b);
+    if (!s.n) { body.innerHTML = '<div class="empty">Niciun task planificat în această perioadă.</div>'; $('rCats').innerHTML = ''; return; }
     const pv = k => p.n ? p[k] : null;
     const G = '#C0DD97', Y = '#FAC775', R = '#F7C1C1', B = '#B5D4F4', N = '#D3D1C7';
     body.innerHTML = `<div class="tiles">
@@ -600,6 +626,19 @@
     ${s.timedN ? seg([[s.less, B], [s.timedN - s.less - s.more, N], [s.more, R]]) + lg([[s.less, B, 'mai puțin'], [s.timedN - s.less - s.more, N, 'cât estimat'], [s.more, R, 'mai mult']]) : '<div class="msg">Nu există taskuri terminate cu timp lucrat.</div>'}
     <div class="rcap">Cele mai mari depășiri</div>
     ${s.over.length ? s.over.map(o => `<div class="rit"><span>${esc(o.t.title)}</span><span>${fmtMin(o.t.estMin)} → ${fmtMin(workedSec(o.t) / 60)}</span></div>`).join('') : '<div class="msg">Nicio depășire în această perioadă.</div>'}`;
+  }
+  function renderRepCats(a, b) {
+    const G = '#C0DD97', Y = '#FAC775', R = '#F7C1C1', box = $('rCats'); box.innerHTML = '';
+    const items = CATS.map(c => [c, repStats(a, b, c.k)]).filter(x => x[1].n);
+    if (!items.length) return;
+    box.innerHTML = '<div class="rh">Pe categorii</div>';
+    for (const [c, sc] of items) {
+      const el = document.createElement('div'); el.className = 'card zone'; el.style.setProperty('--zc', c.color);
+      el.innerHTML = `<div class="zh"><b>${c.name}</b><span class="s">${sc.n} ${sc.n === 1 ? 'task' : 'taskuri'}</span></div>
+        ${seg([[sc.same, G], [sc.later, Y], [sc.open, R]])}${lg([[sc.same, G, 'în ziua lor'], [sc.later, Y, 'mai târziu'], [sc.open, R, 'încă deschise']])}
+        <div class="rmm"><div><b>${Math.round(sc.samePct)}%</b><span>în ziua lor</span></div><div><b>${Math.round(sc.movedPct)}%</b><span>amânate</span></div><div><b>${sc.ratio == null ? '–' : rdec(sc.ratio, 2) + '×'}</b><span>consumat / estimat</span></div></div>`;
+      box.appendChild(el);
+    }
   }
   function openReport() { repRef = ymd(new Date()); renderReport(); $('report').hidden = false; $('report').scrollTop = 0; try { history.pushState({ r: 1 }, ''); } catch (e) {} }
   function closeReport() { $('report').hidden = true; }
@@ -618,6 +657,7 @@
     $('dDone').checked = !!t.done;
     $('dTot').textContent = fmtSec(workedSec(t));
     renderHist(t);
+    for (const b of document.querySelectorAll('#dCat button')) b.classList.toggle('on', b.dataset.c === t.cat);
     if (withSessions) renderSessions();
     else for (const el of document.querySelectorAll('#dSess .sess')) {      // doar durata sesiunii în curs
       const x = t.sessions[+el.dataset.i]; if (x && x.e == null) el.querySelector('.dur').textContent = fmtSec(sessSec(x));
@@ -743,7 +783,7 @@
   };
   $('dDup').onclick = () => {
     const t = cur(); if (!t) return;
-    state.tasks.push(newTask(t.title + ' (copie)', t.estMin, t.date, JSON.parse(JSON.stringify(visComments(t)))));
+    state.tasks.push(newTask(t.title + ' (copie)', t.estMin, t.date, JSON.parse(JSON.stringify(visComments(t))), t.cat));
     save(); checkThresholds(t.date); $('dErr').textContent = 'Task duplicat pe aceeași zi.';
   };
   $('dAddSess').onclick = () => {
@@ -786,7 +826,7 @@
     const title = $('title').value.trim();
     const est = (parseInt($('h').value) || 0) * 60 + (parseInt($('m').value) || 0);
     if (!title) return;
-    state.tasks.push(newTask(title, est, curDay));
+    state.tasks.push(newTask(title, est, curDay, null, newCat)); newCat = 'i'; showNewCat();
     $('title').value = '';
     save(); render(); checkThresholds(curDay);
   };
@@ -807,6 +847,11 @@
     for (const t of dayTasks(curDay)) if (!t.done) { stopTask(t); moveTask(t, nd); }
     save(); render(); checkThresholds(nd);
   };
+  let newCat = 'i';
+  const showNewCat = () => { for (const b of document.querySelectorAll('#catSel button')) b.classList.toggle('on', b.dataset.c === newCat); };
+  $('catSel').onclick = e => { const b = e.target.closest('button'); if (b) { newCat = b.dataset.c; showNewCat(); } };
+  $('dCat').onclick = e => { const b = e.target.closest('button'), t = cur(); if (b && t && t.cat !== b.dataset.c) { t.cat = b.dataset.c; save(); renderDetail(false); } };
+  showNewCat();
   $('repBtn').onclick = openReport;
   $('rBack').onclick = () => { try { history.back(); } catch (e) { closeReport(); } setTimeout(() => { if (!$('report').hidden) closeReport(); }, 50); };
   $('rPrev').onclick = () => { repShift(-1); renderReport(); };
