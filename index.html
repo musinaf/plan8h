@@ -379,7 +379,14 @@
   const limitMin = () => state.limitHours * 60;
   const dayTasks = d => state.tasks.filter(t => t.date === d);
   const plannedMin = d => dayTasks(d).reduce((s, t) => s + t.estMin, 0);
-  const workedMin = d => dayTasks(d).reduce((s, t) => s + workedSec(t)/60, 0);
+  // Timpul lucrat într-o zi = intervalele (ale tuturor taskurilor) care cad în acea zi; un interval peste miezul nopții se împarte pe cele două zile.
+  const workedMin = d => {
+    const a = new Date(d + 'T00:00:00'), b = new Date(a); b.setDate(b.getDate() + 1);
+    const A = a.getTime(), B = b.getTime(), now = Date.now();
+    let ms = 0;
+    for (const t of state.tasks) for (const x of t.sessions) ms += Math.max(0, Math.min(x.e == null ? now : x.e, B) - Math.max(x.s, A));
+    return ms / 60000;
+  };
   const toLocalInput = ms => { const d = new Date(ms); return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   const fromLocalInput = v => { const ms = new Date(v).getTime(); return isNaN(ms) ? null : ms; };
   const dayShort = ['D', 'L', 'Ma', 'Mi', 'J', 'V', 'S'];
