@@ -103,8 +103,9 @@
   .tile { background:var(--bg); border-radius:10px; padding:8px 10px; }
   .tile .n { font-size:20px; font-weight:600; }
   .tile .l { font-size:12px; color:var(--mut); }
-  .flts { display:flex; gap:6px; margin-top:10px; }
-  button.flt { padding:5px 12px; font-size:13px; border-radius:8px; background:transparent; color:var(--mut); border:1px solid var(--line); }
+  .flts { display:flex; gap:6px; margin-top:10px; overflow-x:auto; scrollbar-width:none; }
+  .flts::-webkit-scrollbar { display:none; }
+  button.flt { flex:0 0 auto; padding:5px 12px; font-size:13px; border-radius:8px; background:transparent; color:var(--mut); border:1px solid var(--line); }
   button.flt.on { background:rgba(31,111,235,.12); color:var(--pri); border-color:var(--pri); }
   .task .t small { display:block; }
   .task .t .lc { display:block; color:var(--mut); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -148,7 +149,7 @@
       <div class="tile"><div class="n" id="tPast"></div><div class="l" id="tPastL"></div></div>
     </div>
     <div class="flts" id="flts">
-      <button class="flt on" data-f="all">Toate</button><button class="flt" data-f="past">Din trecut</button><button class="flt" data-f="new">Noi</button>
+      <button class="flt on" data-f="all">Toate</button><button class="flt" data-f="open">Nefinalizate</button><button class="flt" data-f="done">Finalizate</button><button class="flt" data-f="past">Din trecut</button><button class="flt" data-f="new">Noi</button>
     </div>
   </div>
 
@@ -445,7 +446,7 @@
     $('tPast').textContent = carried.length;
     $('tPastL').textContent = 'din zilele trecute' + (carried.length ? ` (${carriedDone} ${carriedDone === 1 ? 'terminat' : 'terminate'})` : '');
     for (const b of document.querySelectorAll('#flts .flt')) b.classList.toggle('on', b.dataset.f === filter);
-    const ts = filter === 'past' ? carried : filter === 'new' ? all.filter(t => !isCarried(t)) : all;
+    const ts = filter === 'past' ? carried : filter === 'new' ? all.filter(t => !isCarried(t)) : filter === 'open' ? all.filter(t => !t.done) : filter === 'done' ? all.filter(t => t.done) : all;
     list.innerHTML = '';
     if (!ts.length) list.innerHTML = `<div class="empty">${all.length ? 'Niciun task în această categorie.' : 'Niciun task pentru această zi.'}</div>`;
     for (const t of ts) {
