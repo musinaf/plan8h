@@ -150,12 +150,15 @@
   .rmm b { font-size:16px; font-weight:600; display:block; }
   .rmm span { font-size:11px; color:var(--txt); }
   .rh { font-size:12px; font-weight:600; margin:2px 4px 8px; }
+  .errbar { background:#FCEBEB; border:1px solid #F09595; color:#791F1F; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:14px; }
+  .errbar[hidden] { display:none; }
 </style>
 </head>
 <body>
 <main id="home">
   <h1>Plan zilnic <span class="hr"><button class="chip n" id="syncChip">Fără sincronizare</button><button class="rep" id="repBtn" aria-label="Raport"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><rect x="5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="16" y="9" width="3" height="8" rx="1"/></svg>Raport</button><button class="ghost" id="notifBtn" aria-label="Activează notificările" title="Activează notificările">🔔</button></span></h1>
 
+  <div class="errbar" id="saveWarn" hidden></div>
   <div id="leftBanner"></div>
 
   <div class="card">
@@ -344,8 +347,15 @@
     }
     return s;
   }
+  const warn = msg => { const b = $('saveWarn'); if (!b) return; b.textContent = msg || ''; b.hidden = !msg; };
   function load() {
-    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.tasks) return migrate(s); } catch (e) {}
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); const s = JSON.parse(raw); if (s && Array.isArray(s.tasks)) return migrate(s); } catch (e) {}
+    if (raw) {   // date deteriorate: le păstrez sub alt nume, ca să nu fie suprascrise de o listă goală
+      let kept = false;
+      try { if (localStorage.getItem(KEY + '.corrupt') == null) localStorage.setItem(KEY + '.corrupt', raw); kept = true; } catch (e) {}
+      warn(kept ? 'Datele salvate pe acest dispozitiv erau deteriorate. Am păstrat o copie separată (plan8h.v1.corrupt). Dacă sincronizarea e activă, taskurile se refac din GitHub.' : 'Datele salvate pe acest dispozitiv erau deteriorate și nu am putut păstra o copie.');
+    }
     return migrate({ tasks: [], limitHours: 8, notified: {} });
   }
   // `u` = ora ultimei modificări a taskului; se actualizează automat când conținutul se schimbă.
@@ -361,7 +371,11 @@
       if (snap[t.id] !== h) { t.u = now; snap[t.id] = h; }
     }
   }
-  function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  let loadWarned = false;
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); if (loadWarned) warn(''); }
+    catch (e) { loadWarned = true; warn('Nu s-a putut salva pe acest dispozitiv (spațiu plin sau blocat de browser). Exportă datele din Setări, ca să nu pierzi modificările.'); }
+  }
   function save() { stamp(); persist(); scheduleSync(); }
   let state = load();
   resetSnap();
