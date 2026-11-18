@@ -332,6 +332,12 @@
         if (t.startedAt) t.sessions.push({ s: t.startedAt, e: null });
       }
       delete t.workedSec; delete t.startedAt;
+      if (!t.sdel || typeof t.sdel !== 'object') t.sdel = {};
+      const used = new Set();
+      for (const x of t.sessions) {   // id-ul vine din ora de start, ca să fie identic pe toate dispozitivele pentru intervalele vechi
+        if (!x.id || used.has(x.id)) { let k = 'g' + x.s; while (used.has(k)) k += 'x'; x.id = k; }
+        used.add(x.id);
+      }
       t.estMin = t.estMin || 0;
       if (!t.created) { const c = parseInt(String(t.id).slice(0, 8), 36); t.created = (c > 1.5e12 && c < 4e12) ? c : t.u; }   // id-ul începe cu ora creării
       if (!t.orig) t.orig = t.date;
@@ -415,7 +421,7 @@
   function moveTask(t, nd) { if (!nd || nd === t.date) return; t.moves.push({ from: t.date, to: nd, at: Date.now() }); t.date = nd; }
   function setDone(t, v) { t.done = !!v; t.doneAt = v ? Date.now() : null; if (v) stopTask(t); }
   const CATS = [{ k: 'u', name: 'Urgent', color: '#F7C1C1' }, { k: 'i', name: 'Important', color: '#FAC775' }, { k: 'o', name: 'Opțional', color: '#C0DD97' }];
-  const newTask = (title, estMin, date, comments, cat) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [], cat: cat || 'i' });
+  const newTask = (title, estMin, date, comments, cat) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [], sdel: {}, cat: cat || 'i' });
   // taskuri nefinalizate rămase pe zile trecute, cele mai vechi primele
   const leftovers = () => { const today = ymd(new Date()); return state.tasks.filter(t => !t.done && t.date < today).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.created || 0) - (b.created || 0)); };
 
@@ -423,7 +429,7 @@
     const now = Date.now();
     for (const t of state.tasks) for (const x of t.sessions) if (x.e == null) x.e = now;
   }
-  function startTask(t) { stopAll(); t.sessions.push({ s: Date.now(), e: null, dev: DEV }); }
+  function startTask(t) { stopAll(); t.sessions.push({ id: uid(), s: Date.now(), e: null, dev: DEV }); }
   function stopTask(t) { const now = Date.now(); for (const x of t.sessions) if (x.e == null) x.e = now; }
 
   // ---- notificări ----
@@ -811,14 +817,14 @@
   };
   $('dAddSess').onclick = () => {
     const t = cur(); if (!t) return;
-    const now = Date.now(); t.sessions.push({ s: now - 30*60000, e: now });
+    const now = Date.now(); t.sessions.push({ id: uid(), s: now - 30*60000, e: now });
     t.sessions.sort((a, b) => a.s - b.s); save(); $('dErr').textContent = ''; renderDetail(true); checkThresholds();
   };
   $('dSess').onclick = e => {
     const t = cur(), row = e.target.closest('.sess'); if (!t || !row) return;
     const i = +row.dataset.i, x = t.sessions[i]; if (!x) return;
     if (e.target.closest('.del')) {                       // ștergere directă, cu Anulează
-      t.sessions.splice(i, 1); undo = { id: t.id, x }; editIdx = null;
+      t.sessions.splice(i, 1); t.sdel[x.id] = Date.now(); undo = { id: t.id, x }; editIdx = null;
       save(); $('dErr').textContent = ''; renderDetail(true); showUndo(); return;
     }
     if (e.target.closest('.cn')) { editIdx = null; $('dErr').textContent = ''; renderSessions(); return; }
@@ -839,7 +845,7 @@
   $('undoBtn').onclick = () => {
     if (!undo) return;
     const t = state.tasks.find(x => x.id === undo.id);
-    if (t) { t.sessions.push(undo.x); t.sessions.sort((a, b) => a.s - b.s); save(); if (openId === t.id) renderDetail(true); }
+    if (t) { t.sessions.push(undo.x); delete t.sdel[undo.x.id]; t.sessions.sort((a, b) => a.s - b.s); save(); if (openId === t.id) renderDetail(true); }
     undo = null; $('toast').hidden = true; clearTimeout(undoTimer);
   };
 
@@ -947,6 +953,18 @@
     return { tasks: s.tasks, deleted: d.deleted || {}, limitHours: s.limitHours, limitU: d.limitU || 0, notified: s.notified };
   }
   const cmod = c => Math.max(c.ts || 0, c.ed || 0, c.del || 0);
+  // Intervalele din ambele versiuni se păstrează (după id); cele șterse pe oricare dispozitiv rămân șterse; la același id câștigă versiunea taskului mai nou.
+  function mergeSessions(win, lose) {
+    const cut = Date.now() - 60 * 864e5, sdel = {};
+    for (const o of [lose.sdel || {}, win.sdel || {}]) for (const k in o) sdel[k] = Math.max(sdel[k] || 0, o[k]);
+    const m = {};
+    for (const x of [...(lose.sessions || []), ...(win.sessions || [])]) m[x.id] = { ...x };
+    for (const k in sdel) { delete m[k]; if (sdel[k] < cut) delete sdel[k]; }
+    const ss = Object.values(m).sort((a, b) => a.s - b.s || (a.id < b.id ? -1 : 1));
+    const run = ss.filter(x => x.e == null);                 // două cronometre pornite pe același task, pe dispozitive diferite: rămâne cel mai nou
+    if (run.length > 1) { const keep = run.reduce((a, b) => (b.s > a.s ? b : a)); for (const x of run) if (x !== keep) x.e = Math.max(x.s, Math.min(keep.s, Date.now())); }
+    return { sessions: ss, sdel };
+  }
   function mergeComments(a, b) {
     const m = {};
     for (const c of [...(a || []), ...(b || [])]) { const o = m[c.id]; if (!o || cmod(c) > cmod(o)) m[c.id] = c; }
@@ -962,7 +980,7 @@
     for (const t of L.tasks) {
       const r = map[t.id]; if (!r) { map[t.id] = t; continue; }
       const win = (t.u || 0) > (r.u || 0) ? t : r, lose = win === t ? r : t;
-      map[t.id] = { ...win, comments: mergeComments(win.comments, lose.comments) };   // comentariile se unesc, nu se pierd
+      map[t.id] = { ...win, comments: mergeComments(win.comments, lose.comments), ...mergeSessions(win, lose) };   // comentariile și intervalele se unesc, nu se pierd
     }
     const tasks = [];
     for (const id in map) { const t = map[id]; if (del[id] && del[id] >= (t.u || 0)) continue; tasks.push(t); }
