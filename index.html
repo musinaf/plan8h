@@ -1026,7 +1026,16 @@
       for (let attempt = 0; attempt < 3 && !ok; attempt++) {
         const r = await api('/contents/' + FILE + '?t=' + Date.now());
         let remote = null, sha = null;
-        if (r.status === 200) { const j = await r.json(); sha = j.sha; remote = normRemote(JSON.parse(dec(j.content))); }
+        if (r.status === 200) {
+          const j = await r.json(); sha = j.sha; let txt;
+          if (j.content && j.encoding !== 'none') txt = dec(j.content);
+          else {   // peste 1 MB GitHub nu mai trimite conținutul în răspunsul obișnuit; îl cerem în format brut
+            const rr = await api('/contents/' + FILE + '?t=' + Date.now(), { headers: { Accept: 'application/vnd.github.raw+json' } });
+            if (!rr.ok) throw { http: rr.status };
+            txt = await rr.text();
+          }
+          remote = normRemote(JSON.parse(txt));
+        }
         else if (r.status === 404) { /* încă nu există fișierul */ }
         else if (r.status === 401 || (r.status === 403 && r.headers.get('x-ratelimit-remaining') !== '0')) throw { auth: true };
         else throw { http: r.status };
