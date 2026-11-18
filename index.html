@@ -64,9 +64,9 @@
   .msg { font-size:13px; color:var(--mut); margin-top:6px; }
   details summary { cursor:pointer; color:var(--mut); }
   label.small { font-size:14px; color:var(--mut); }
-  #detail { position:fixed; inset:0; background:var(--bg); overflow-y:auto; z-index:10;
+  #detail, #report { position:fixed; inset:0; background:var(--bg); overflow-y:auto; z-index:10;
             padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
-  #detail[hidden] { display:none; }
+  #detail[hidden], #report[hidden] { display:none; }
   .dh { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
   .sess { border-top:1px solid var(--line); }
   .sess:first-child { border-top:0; }
@@ -102,7 +102,7 @@
   .tiles { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
   .tile { background:var(--bg); border-radius:10px; padding:8px 10px; }
   .tile .n { font-size:20px; font-weight:600; }
-  .tile .l { font-size:12px; color:var(--mut); }
+  .tile .l { font-size:12px; color:var(--txt); }
   .flts { display:flex; gap:6px; margin-top:10px; overflow-x:auto; scrollbar-width:none; }
   .flts::-webkit-scrollbar { display:none; }
   button.flt { flex:0 0 auto; padding:5px 12px; font-size:13px; border-radius:8px; background:transparent; color:var(--mut); border:1px solid var(--line); }
@@ -121,11 +121,20 @@
   .ev.m::before { background:var(--warn); }
   .ev.d::before { background:var(--ok); }
   .ev .w { font-size:12px; color:var(--mut); }
+  .rnav { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .rnav button { padding:6px 14px; }
+  .tile .n small { font-size:12px; font-weight:400; color:var(--txt); }
+  .rcap { font-size:12px; color:var(--txt); margin:14px 0 6px; }
+  .rst { display:flex; height:18px; border-radius:5px; overflow:hidden; gap:2px; }
+  .rlg { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:12px; color:var(--txt); margin-top:6px; }
+  .rlg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  .rit { display:flex; justify-content:space-between; gap:8px; font-size:13px; padding:6px 0; border-top:1px solid var(--line); }
+  .rit span:last-child { color:var(--txt); white-space:nowrap; }
 </style>
 </head>
 <body>
 <main id="home">
-  <h1>Plan zilnic <span class="hr"><button class="chip n" id="syncChip">Fără sincronizare</button><button class="ghost" id="notifBtn">🔔 Activează</button></span></h1>
+  <h1>Plan zilnic <span class="hr"><button class="chip n" id="syncChip">Fără sincronizare</button><button class="ghost" id="repBtn" aria-label="Raport">📊</button><button class="ghost" id="notifBtn">🔔 Activează</button></span></h1>
 
   <div id="leftBanner"></div>
 
@@ -197,6 +206,19 @@
     </details>
   </div>
 </main>
+
+<div id="report" hidden>
+  <main>
+    <div class="dh">
+      <button class="sec" id="rBack">‹ Înapoi</button>
+      <div class="flts" id="rMode" style="margin:0"><button class="flt on" data-m="week">Săptămână</button><button class="flt" data-m="month">Lună</button></div>
+    </div>
+    <div class="card">
+      <div class="rnav"><button class="sec" id="rPrev" aria-label="Perioada anterioară">‹</button><b id="rLbl"></b><button class="sec" id="rNext" aria-label="Perioada următoare">›</button></div>
+      <div id="rBody"></div>
+    </div>
+  </main>
+</div>
 
 <div id="detail" hidden>
   <main>
@@ -508,8 +530,74 @@
     $('detail').scrollTop = 0;
     try { history.pushState({ d: 1 }, ''); } catch (e) {}
   }
+  // ---- raport ----
+  const MONF = ['ianuarie','februarie','martie','aprilie','mai','iunie','iulie','august','septembrie','octombrie','noiembrie','decembrie'];
+  let repMode = 'week', repRef = ymd(new Date());
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const rdec = (x, n) => x.toFixed(n).replace('.', ',');
+  function repRange(mode, ref) {
+    const d = new Date(ref + 'T12:00:00');
+    if (mode === 'week') { const s = new Date(d); s.setDate(d.getDate() - (d.getDay() + 6) % 7); const e = new Date(s); e.setDate(s.getDate() + 6); return [ymd(s), ymd(e)]; }
+    return [ymd(new Date(d.getFullYear(), d.getMonth(), 1, 12)), ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0, 12))];
+  }
+  function repShift(dir) {
+    const d = new Date(repRef + 'T12:00:00');
+    if (repMode === 'week') d.setDate(d.getDate() + 7 * dir); else { d.setDate(1); d.setMonth(d.getMonth() + dir); }
+    repRef = ymd(d);
+  }
+  // taskurile sunt grupate după data planificată inițial (orig)
+  function repStats(a, b) {
+    const ts = state.tasks.filter(t => t.orig >= a && t.orig <= b), n = ts.length;
+    if (!n) return { n: 0 };
+    const done = ts.filter(t => t.done);
+    const same = done.filter(t => t.doneAt && ymd(new Date(t.doneAt)) <= t.orig).length;
+    const moved = ts.filter(t => t.moves.length);
+    const ages = done.filter(t => t.doneAt).map(t => Math.max(0, daysBetween(t.orig, ymd(new Date(t.doneAt)))));
+    const timed = done.filter(t => t.estMin > 0 && workedSec(t) > 0);
+    const est = timed.reduce((x, t) => x + t.estMin, 0), wk = timed.reduce((x, t) => x + workedSec(t) / 60, 0);
+    const rt = t => workedSec(t) / 60 / t.estMin;
+    return { n, doneN: done.length, same, later: done.length - same, open: n - done.length,
+      samePct: same / n * 100, movedPct: moved.length / n * 100,
+      avgMoves: moved.length ? moved.reduce((x, t) => x + t.moves.length, 0) / moved.length : 0,
+      age: ages.length ? ages.reduce((x, y) => x + y, 0) / ages.length : null,
+      ratio: est ? wk / est : null, timedN: timed.length,
+      less: timed.filter(t => rt(t) < 0.8).length, more: timed.filter(t => rt(t) > 1.2).length,
+      over: timed.map(t => ({ t, diff: workedSec(t) / 60 - t.estMin })).filter(o => o.diff > 0).sort((x, y) => y.diff - x.diff).slice(0, 3) };
+  }
+  function trend(cur, prev, fmt) {
+    if (cur == null || prev == null) return '';
+    const d = cur - prev; if (Math.abs(d) < 0.005) return ' <small>＝</small>';
+    return ` <small>${d > 0 ? '▲' : '▼'} ${fmt(Math.abs(d))}</small>`;
+  }
+  const seg = (parts) => { const tot = parts.reduce((x, p) => x + p[0], 0); return tot ? `<div class="rst">${parts.filter(p => p[0]).map(p => `<div style="flex:${p[0]};background:${p[1]}"></div>`).join('')}</div>` : ''; };
+  const lg = (parts) => `<div class="rlg">${parts.map(p => `<span><i style="background:${p[1]}"></i>${p[2]} ${p[0]}</span>`).join('')}</div>`;
+  function renderReport() {
+    for (const b of document.querySelectorAll('#rMode .flt')) b.classList.toggle('on', b.dataset.m === repMode);
+    const [a, b] = repRange(repMode, repRef);
+    $('rLbl').textContent = repMode === 'week' ? `${fmtShort(a)} – ${fmtShort(b)} ${b.slice(0, 4)}` : `${MONF[+a.slice(5, 7) - 1]} ${a.slice(0, 4)}`;
+    const dp = new Date(a + 'T12:00:00'); dp.setDate(dp.getDate() - 1);
+    const [pa, pb] = repRange(repMode, ymd(dp));
+    const s = repStats(a, b), p = repStats(pa, pb), body = $('rBody');
+    if (!s.n) { body.innerHTML = '<div class="empty">Niciun task planificat în această perioadă.</div>'; return; }
+    const pv = k => p.n ? p[k] : null;
+    const G = '#C0DD97', Y = '#FAC775', R = '#F7C1C1', B = '#B5D4F4', N = '#D3D1C7';
+    body.innerHTML = `<div class="tiles">
+      <div class="tile"><div class="n">${Math.round(s.samePct)}%${trend(s.samePct, pv('samePct'), x => Math.round(x))}</div><div class="l">închise în ziua planificată</div></div>
+      <div class="tile"><div class="n">${Math.round(s.movedPct)}%${trend(s.movedPct, pv('movedPct'), x => Math.round(x))}</div><div class="l">amânate${s.avgMoves ? ' · medie ' + rdec(s.avgMoves, 1) + ' mutări' : ''}</div></div>
+      <div class="tile"><div class="n">${s.ratio == null ? '–' : rdec(s.ratio, 2) + '×'}${trend(s.ratio, pv('ratio'), x => rdec(x, 2))}</div><div class="l">consumat / estimat</div></div>
+      <div class="tile"><div class="n">${s.age == null ? '–' : rdec(s.age, 1) + ' zile'}${trend(s.age, pv('age'), x => rdec(x, 1))}</div><div class="l">vârstă la închidere</div></div>
+    </div>
+    <div class="rcap">Ce s-a întâmplat cu cele ${s.n} taskuri planificate</div>
+    ${seg([[s.same, G], [s.later, Y], [s.open, R]])}${lg([[s.same, G, 'închise în ziua lor'], [s.later, Y, 'închise mai târziu'], [s.open, R, 'încă deschise']])}
+    <div class="rcap">Estimat față de consumat (taskuri terminate, cu cronometru)</div>
+    ${s.timedN ? seg([[s.less, B], [s.timedN - s.less - s.more, N], [s.more, R]]) + lg([[s.less, B, 'mai puțin'], [s.timedN - s.less - s.more, N, 'cât estimat'], [s.more, R, 'mai mult']]) : '<div class="msg">Nu există taskuri terminate cu timp lucrat.</div>'}
+    <div class="rcap">Cele mai mari depășiri</div>
+    ${s.over.length ? s.over.map(o => `<div class="rit"><span>${esc(o.t.title)}</span><span>${fmtMin(o.t.estMin)} → ${fmtMin(workedSec(o.t) / 60)}</span></div>`).join('') : '<div class="msg">Nicio depășire în această perioadă.</div>'}`;
+  }
+  function openReport() { repRef = ymd(new Date()); renderReport(); $('report').hidden = false; $('report').scrollTop = 0; try { history.pushState({ r: 1 }, ''); } catch (e) {} }
+  function closeReport() { $('report').hidden = true; }
   function closeDetail() { $('detail').hidden = true; openId = null; render(); }
-  window.addEventListener('popstate', () => { if (!$('detail').hidden) closeDetail(); });
+  window.addEventListener('popstate', () => { if (!$('report').hidden) closeReport(); else if (!$('detail').hidden) closeDetail(); });
 
   function renderDetail(withSessions) {
     const t = cur(); if (!t) return;
@@ -712,6 +800,11 @@
     for (const t of dayTasks(curDay)) if (!t.done) { stopTask(t); moveTask(t, nd); }
     save(); render(); checkThresholds(nd);
   };
+  $('repBtn').onclick = openReport;
+  $('rBack').onclick = () => { try { history.back(); } catch (e) { closeReport(); } setTimeout(() => { if (!$('report').hidden) closeReport(); }, 50); };
+  $('rPrev').onclick = () => { repShift(-1); renderReport(); };
+  $('rNext').onclick = () => { repShift(1); renderReport(); };
+  $('rMode').onclick = e => { const b = e.target.closest('.flt'); if (b) { repMode = b.dataset.m; renderReport(); } };
   $('flts').onclick = e => { const b = e.target.closest('.flt'); if (b) { filter = b.dataset.f; render(); } };
   $('leftBanner').onclick = e => {
     const L = leftovers(), m = e.target.closest('.lbm');
