@@ -144,7 +144,7 @@
   .catsel button { color:#111; border:1.5px solid transparent; }
   .catsel button[data-c=u] { background:#FCEBEB; } .catsel button[data-c=i] { background:#FAEEDA; } .catsel button[data-c=o] { background:#EAF3DE; }
   .catsel button.on { border:1.5px solid #111; font-weight:600; }
-  button.stp { width:44px; height:40px; padding:0; font-size:22px; line-height:1; border-radius:10px; background:var(--card); color:var(--txt); border:1px solid var(--line); }
+  button.stp { width:44px; height:40px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:10px; background:var(--card); color:#111; border:1.5px solid #9ca3af; }
   .rmm { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px; }
   .rmm div { background:var(--bg); border-radius:10px; padding:6px 8px; }
   .rmm b { font-size:16px; font-weight:600; display:block; }
@@ -188,8 +188,8 @@
       <div class="catsel" id="catSel"><button type="button" data-c="u">Urgent</button><button type="button" data-c="i">Important</button><button type="button" data-c="o">Opțional</button></div>
       <div class="row" style="margin-top:8px;gap:6px">
         <div id="estV" style="flex:1;font-size:16px;font-weight:600">30 min</div>
-        <button type="button" class="stp" id="estMinus" aria-label="Mai puțin cu 30 de minute">−</button>
-        <button type="button" class="stp" id="estPlus" aria-label="Mai mult cu 30 de minute">+</button>
+        <button type="button" class="stp" id="estMinus" aria-label="Mai puțin cu 30 de minute"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button type="button" class="stp" id="estPlus" aria-label="Mai mult cu 30 de minute"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button>
         <button type="submit" style="margin-left:4px;height:40px;padding:0 16px">Adaugă</button>
       </div>
     </form>
@@ -850,7 +850,7 @@
     save(); render(); checkThresholds(nd);
   };
   let newCat = 'i', newEst = 30;
-  const showEst = () => { $('estV').textContent = fmtEstStep(newEst); $('estMinus').style.opacity = newEst <= 30 ? .4 : 1; $('estPlus').style.opacity = newEst >= 720 ? .4 : 1; };
+  const showEst = () => { $('estV').textContent = fmtEstStep(newEst);  };
   const fmtEstStep = m => { const hh = Math.floor(m / 60), mm = m % 60; return (hh ? hh + ' h' : '') + (hh && mm ? ' ' : '') + (mm ? mm + ' min' : ''); };
   $('estMinus').onclick = () => { newEst = Math.max(30, newEst - 30); showEst(); };
   $('estPlus').onclick = () => { newEst = Math.min(720, newEst + 30); showEst(); };
