@@ -140,8 +140,11 @@
   .zh b { font-size:15px; font-weight:600; }
   .zh .s { margin-left:auto; font-size:12px; color:var(--txt); }
   .catsel { display:flex; gap:6px; margin-top:8px; }
-  .catsel button { flex:1; height:40px; padding:0; border-radius:10px; font-size:13px; background:var(--card); color:var(--txt); border:1px solid var(--line); }
-  .catsel button.on { border:1.5px solid var(--pri); background:rgba(31,111,235,.12); color:var(--pri); font-weight:500; }
+  .catsel button { flex:1; height:40px; padding:0; border-radius:10px; font-size:13px; }
+  .catsel button { color:#111; border:1.5px solid transparent; }
+  .catsel button[data-c=u] { background:#FCEBEB; } .catsel button[data-c=i] { background:#FAEEDA; } .catsel button[data-c=o] { background:#EAF3DE; }
+  .catsel button.on { border:1.5px solid #111; font-weight:600; }
+  button.stp { width:44px; height:40px; padding:0; font-size:22px; line-height:1; border-radius:10px; background:var(--card); color:var(--txt); border:1px solid var(--line); }
   .rmm { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px; }
   .rmm div { background:var(--bg); border-radius:10px; padding:6px 8px; }
   .rmm b { font-size:16px; font-weight:600; display:block; }
@@ -183,12 +186,11 @@
     <form id="form">
       <input type="text" id="title" placeholder="Task nou…" required autocomplete="off">
       <div class="catsel" id="catSel"><button type="button" data-c="u">Urgent</button><button type="button" data-c="i">Important</button><button type="button" data-c="o">Opțional</button></div>
-      <div class="row" style="margin-top:8px">
-        <input type="number" id="h" min="0" max="24" placeholder="ore" inputmode="numeric" value="0">
-        <span>h</span>
-        <input type="number" id="m" min="0" max="59" step="5" placeholder="min" inputmode="numeric" value="30">
-        <span>min</span>
-        <button type="submit">Adaugă</button>
+      <div class="row" style="margin-top:8px;gap:6px">
+        <div id="estV" style="flex:1;font-size:16px;font-weight:600">30 min</div>
+        <button type="button" class="stp" id="estMinus" aria-label="Mai puțin cu 30 de minute">−</button>
+        <button type="button" class="stp" id="estPlus" aria-label="Mai mult cu 30 de minute">+</button>
+        <button type="submit" style="margin-left:4px;height:40px;padding:0 16px">Adaugă</button>
       </div>
     </form>
   </div>
@@ -824,9 +826,9 @@
   $('form').onsubmit = e => {
     e.preventDefault();
     const title = $('title').value.trim();
-    const est = (parseInt($('h').value) || 0) * 60 + (parseInt($('m').value) || 0);
+    const est = newEst;
     if (!title) return;
-    state.tasks.push(newTask(title, est, curDay, null, newCat)); newCat = 'i'; showNewCat();
+    state.tasks.push(newTask(title, est, curDay, null, newCat)); newCat = 'i'; newEst = 30; showNewCat(); showEst();
     $('title').value = '';
     save(); render(); checkThresholds(curDay);
   };
@@ -847,7 +849,12 @@
     for (const t of dayTasks(curDay)) if (!t.done) { stopTask(t); moveTask(t, nd); }
     save(); render(); checkThresholds(nd);
   };
-  let newCat = 'i';
+  let newCat = 'i', newEst = 30;
+  const showEst = () => { $('estV').textContent = fmtEstStep(newEst); $('estMinus').style.opacity = newEst <= 30 ? .4 : 1; $('estPlus').style.opacity = newEst >= 720 ? .4 : 1; };
+  const fmtEstStep = m => { const hh = Math.floor(m / 60), mm = m % 60; return (hh ? hh + ' h' : '') + (hh && mm ? ' ' : '') + (mm ? mm + ' min' : ''); };
+  $('estMinus').onclick = () => { newEst = Math.max(30, newEst - 30); showEst(); };
+  $('estPlus').onclick = () => { newEst = Math.min(720, newEst + 30); showEst(); };
+  showEst();
   const showNewCat = () => { for (const b of document.querySelectorAll('#catSel button')) b.classList.toggle('on', b.dataset.c === newCat); };
   $('catSel').onclick = e => { const b = e.target.closest('button'); if (b) { newCat = b.dataset.c; showNewCat(); } };
   $('dCat').onclick = e => { const b = e.target.closest('button'), t = cur(); if (b && t && t.cat !== b.dataset.c) { t.cat = b.dataset.c; save(); renderDetail(false); } };
