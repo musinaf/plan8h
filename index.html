@@ -478,12 +478,13 @@
       lbKey = key;
       el.innerHTML = '<div class="warnbar"><b></b><div class="s"></div>' +
         '<div class="row" style="margin-top:10px;justify-content:space-between"><span class="s" style="margin:0">Mută pe:</span><span class="s" id="lbTo" style="margin:0"></span></div>' +
-        '<div class="row" style="margin-top:6px;align-items:center;gap:6px;flex-wrap:nowrap"><button class="sec lbm" data-m="today" style="padding:8px 10px">Astăzi</button><button class="sec lbm" data-m="tomorrow" style="padding:8px 10px">Mâine</button>' +
-        '<span class="s" style="margin:0">peste</span><input type="number" id="lbN" min="1" max="365" inputmode="numeric" style="width:46px;padding:0 4px;text-align:center"><span class="s" style="margin:0">zile</span></div>' +
+        '<div class="row" id="lbRow" style="margin-top:6px;align-items:center;gap:6px;flex-wrap:nowrap"><button class="sec lbm" data-m="today" style="padding:8px 10px">Astăzi</button><button class="sec lbm" data-m="tomorrow" style="padding:8px 10px">Mâine</button>' +
+        '<span class="s" style="margin:0">peste</span><input type="number" id="lbN" min="1" max="365" inputmode="numeric" style="width:46px;padding:0 4px;text-align:center;box-sizing:border-box;height:var(--bh)"><span class="s" style="margin:0">zile</span></div>' +
         '<div class="row" style="margin-top:10px"><button id="lbMove">Mută</button><button class="sec" id="lbSee">Vezi taskurile</button></div></div>';
       el.querySelector('b').textContent = (L.length === 1 ? '1 task nefinalizat' : L.length + ' taskuri nefinalizate') + ' din zile trecute';
       el.querySelector('.s').textContent = `Cel mai vechi: ${fmtShort(L[0].date)} · ${L[0].title}`;
       $('lbN').value = lbDays;
+      $('lbRow').style.setProperty('--bh', $('lbRow').querySelector('button').offsetHeight + 'px');
     }
     for (const b of el.querySelectorAll('.lbm')) b.style.outline = b.dataset.m === lbMode ? '2px solid var(--pri)' : '';
     $('lbN').style.outline = lbMode === 'days' ? '2px solid var(--pri)' : '';
