@@ -1,4 +1,4 @@
-const CACHE = 'plan8h-v3';
+const CACHE = 'plan8h-v4';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -9,6 +9,8 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // doar fișierele aplicației; apelurile către GitHub (date, token) nu trec prin cache
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request).then(r => {
       const copy = r.clone();
