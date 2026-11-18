@@ -236,7 +236,7 @@
     <details>
       <summary>Setări</summary>
       <div class="row" style="margin-top:10px">
-        <label class="small" for="limit">Prag notificare (ore):</label>
+        <label class="small" for="limit" id="limLbl">Prag notificare (ore):</label>
         <input type="number" id="limit" min="1" max="24" step="0.5" style="width:90px">
       </div>
       <div class="row wrap" style="margin-top:12px">
@@ -355,6 +355,8 @@
     s.notified = s.notified || {};
     s.deleted = s.deleted || {};
     s.limitU = s.limitU || 0;
+    s.limitHoursP = s.limitHoursP > 0 ? s.limitHoursP : s.limitHours;   // Personal Plan: prag propriu (inițial egal cu cel de la Work)
+    s.limitUP = s.limitUP || 0;
     const now = Date.now();
     for (const t of s.tasks) {
       if (!t.u) t.u = now;
@@ -397,7 +399,7 @@
       try { if (localStorage.getItem(KEY + '.corrupt') == null) localStorage.setItem(KEY + '.corrupt', raw); kept = true; } catch (e) {}
       warn(kept ? 'Datele salvate pe acest dispozitiv erau deteriorate. Am păstrat o copie separată (plan8h.v1.corrupt). Dacă sincronizarea e activă, taskurile se refac din GitHub.' : 'Datele salvate pe acest dispozitiv erau deteriorate și nu am putut păstra o copie.');
     }
-    return migrate({ tasks: [], limitHours: 8, notified: {} });
+    return migrate({ tasks: [], limitHours: 8, limitHoursP: 8, notified: {} });
   }
   // `u` = ora ultimei modificări a taskului; se actualizează automat când conținutul se schimbă.
   const snap = {};
@@ -431,7 +433,8 @@
   const sessSec = x => ((x.e == null ? Date.now() : x.e) - x.s) / 1000;
   const workedSec = t => t.sessions.reduce((a, x) => a + Math.max(0, sessSec(x)), 0);
   const isRunning = t => t.sessions.some(x => x.e == null);
-  const limitMin = () => state.limitHours * 60;
+  const limHours = (pl = curPlan) => pl === 'p' ? state.limitHoursP : state.limitHours;
+  const limitMin = (pl = curPlan) => limHours(pl) * 60;
   const PLANS = [{ k: 'w', name: 'Work Plan', color: '#B5D4F4' }, { k: 'p', name: 'Personal Plan', color: '#C0DD97' }];
   let curPlan = 'w';
   try { const sp = localStorage.getItem('plan8h.plan'); if (sp === 'w' || sp === 'p') curPlan = sp; } catch (e) {}
@@ -490,12 +493,11 @@
   // Planificat: pentru orice zi de azi încolo. Lucrat: doar azi. O singură notificare pe tip și zi.
   function checkThresholds(extraDay) {
     const today = ymd(new Date());
-    const lim = limitMin(), lh = state.limitHours;
     const days = new Set([today]);
     if (extraDay && extraDay >= today) days.add(extraDay);
     // cele 8 ore se socotesc separat pe fiecare plan; notificările vin indiferent care plan e deschis
     for (const P of PLANS) {
-      const sf = P.k === 'w' ? '' : '_' + P.k, pre = P.k === 'w' ? '' : P.name + ': ';
+      const sf = P.k === 'w' ? '' : '_' + P.k, pre = P.k === 'w' ? '' : P.name + ': ', lim = limitMin(P.k), lh = limHours(P.k);
       for (const d of days) {
         const n = state.notified[d] || (state.notified[d] = {});
         if (!n['planned' + sf] && plannedMin(d, P.k) >= lim) {
@@ -535,8 +537,8 @@
   }
   function renderMeters() {
     const p = plannedMin(curDay), w = workedMin(curDay);
-    $('plannedTxt').textContent = `${fmtMin(p)} / ${state.limitHours}h`;
-    $('workedTxt').textContent = `${fmtMin(w)} / ${state.limitHours}h`;
+    $('plannedTxt').textContent = `${fmtMin(p)} / ${limHours()}h`;
+    $('workedTxt').textContent = `${fmtMin(w)} / ${limHours()}h`;
     setBar('plannedBar', p); setBar('workedBar', w);
   }
   function renderWeek() {
@@ -556,7 +558,7 @@
   }
   function render() {
     $('day').value = curDay;
-    $('limit').value = state.limitHours;
+    $('limit').value = limHours(); $('limLbl').textContent = 'Prag notificare, ' + PLANS.find(x => x.k === curPlan).name + ' (ore):';
     const list = $('list');
     const all = dayTasks(curDay);
     const carried = all.filter(isCarried), carriedDone = carried.filter(t => t.done).length;
@@ -1016,7 +1018,12 @@
   $('week').onclick = e => { const el = e.target.closest('.wd'); if (el) { curDay = el.dataset.d; render(); } };
   $('limit').onchange = e => {
     const v = parseFloat(e.target.value);
-    if (v > 0) { state.limitHours = v; state.limitU = Date.now(); state.notified = {}; save(); render(); checkThresholds(); }
+    if (v > 0) {
+      const p = curPlan === 'p', sf = p ? '_p' : '';
+      if (p) { state.limitHoursP = v; state.limitUP = Date.now(); } else { state.limitHours = v; state.limitU = Date.now(); }
+      for (const d in state.notified) { delete state.notified[d]['planned' + sf]; delete state.notified[d]['worked' + sf]; }   // renotifică doar pentru planul modificat
+      save(); render(); checkThresholds();
+    }
   };
 
   // ---- export / import ----
@@ -1037,7 +1044,7 @@
       const old = state, ns = migrate(s), now = Date.now();
       for (const t of old.tasks) if (!ns.tasks.some(x => x.id === t.id)) ns.deleted[t.id] = now;   // ce nu e în fișier, dispare și la sincronizare
       for (const t of ns.tasks) t.u = now;
-      ns.limitU = now; state = ns; resetSnap(); save(); render();
+      ns.limitU = now; ns.limitUP = now; state = ns; resetSnap(); save(); render();
     } catch (err) { alert('Fișierul nu pare a fi o copie Plan 8h.'); }
     e.target.value = '';
   };
@@ -1055,11 +1062,11 @@
   const stable = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
   const NKEYS = ['planned', 'worked', 'leftover', 'planned_p', 'worked_p', 'leftover_p'];
   const cleanNotified = n => { const o = {}; for (const d in (n || {})) if (n[d] && NKEYS.some(k => n[d][k])) o[d] = n[d]; return o; };
-  const canon = d => stable({ tasks: [...d.tasks].sort((a, b) => a.id < b.id ? -1 : 1), deleted: d.deleted, limitHours: d.limitHours, limitU: d.limitU || 0, notified: cleanNotified(d.notified) });
-  const localDoc = () => ({ tasks: state.tasks, deleted: state.deleted, limitHours: state.limitHours, limitU: state.limitU, notified: state.notified });
+  const canon = d => stable({ tasks: [...d.tasks].sort((a, b) => a.id < b.id ? -1 : 1), deleted: d.deleted, limitHours: d.limitHours, limitU: d.limitU || 0, limitHoursP: d.limitHoursP, limitUP: d.limitUP || 0, notified: cleanNotified(d.notified) });
+  const localDoc = () => ({ tasks: state.tasks, deleted: state.deleted, limitHours: state.limitHours, limitU: state.limitU, limitHoursP: state.limitHoursP, limitUP: state.limitUP, notified: state.notified });
   function normRemote(d) {
-    const s = migrate({ tasks: Array.isArray(d.tasks) ? d.tasks : [], limitHours: d.limitHours, notified: d.notified || {} });
-    return { tasks: s.tasks, deleted: d.deleted || {}, limitHours: s.limitHours, limitU: d.limitU || 0, notified: s.notified };
+    const s = migrate({ tasks: Array.isArray(d.tasks) ? d.tasks : [], limitHours: d.limitHours, limitHoursP: d.limitHoursP, notified: d.notified || {} });
+    return { tasks: s.tasks, deleted: d.deleted || {}, limitHours: s.limitHours, limitU: d.limitU || 0, limitHoursP: s.limitHoursP, limitUP: d.limitUP || 0, notified: s.notified };
   }
   const cmod = c => Math.max(c.ts || 0, c.ed || 0, c.del || 0);
   // Intervalele din ambele versiuni se păstrează (după id); cele șterse pe oricare dispozitiv rămân șterse; la același id câștigă versiunea taskului mai nou.
@@ -1095,9 +1102,10 @@
     for (const id in map) { const t = map[id]; if (del[id] && del[id] >= (t.u || 0)) continue; tasks.push(t); }
     const cut = Date.now() - 60 * 864e5;
     for (const k in del) if (del[k] < cut) delete del[k];
-    const lu = (L.limitU || 0) >= (R.limitU || 0) ? L : R;
+    const lw = (L.limitU || 0) >= (R.limitU || 0) ? L : R, lpp = (L.limitUP || 0) >= (R.limitUP || 0) ? L : R;
+    const mx = x => Math.max(x.limitU || 0, x.limitUP || 0), lu = mx(L) >= mx(R) ? L : R;
     let notified = {};
-    if ((L.limitU || 0) !== (R.limitU || 0)) notified = cleanNotified(lu.notified);
+    if ((L.limitU || 0) !== (R.limitU || 0) || (L.limitUP || 0) !== (R.limitUP || 0)) notified = cleanNotified(lu.notified);
     else {
       const ln = cleanNotified(L.notified), rn = cleanNotified(R.notified);
       for (const d of new Set([...Object.keys(ln), ...Object.keys(rn)])) {
@@ -1105,15 +1113,16 @@
       }
     }
     tasks.sort((a, b) => a.id < b.id ? -1 : 1);       // aceeași ordine pe toate dispozitivele (id-ul începe cu ora creării)
-    return { tasks, deleted: del, limitHours: lu.limitHours, limitU: lu.limitU || 0, notified };
+    return { tasks, deleted: del, limitHours: lw.limitHours, limitU: lw.limitU || 0, limitHoursP: lpp.limitHoursP, limitUP: lpp.limitUP || 0, notified };
   }
   function applyMerged(m) {
     const Lmap = {}; for (const t of state.tasks) Lmap[t.id] = t;
     const ids = new Set(); let changes = 0, openChanged = false;
     for (const t of m.tasks) { ids.add(t.id); const l = Lmap[t.id]; if (!l || stable(l) !== stable(t)) { changes++; if (t.id === openId) openChanged = true; } }
     for (const id in Lmap) if (!ids.has(id)) { changes++; if (id === openId) openChanged = true; }
-    state.tasks = m.tasks; state.deleted = m.deleted; state.limitHours = m.limitHours; state.limitU = m.limitU; state.notified = m.notified;
+    state.tasks = m.tasks; state.deleted = m.deleted; state.limitHours = m.limitHours; state.limitU = m.limitU; state.limitHoursP = m.limitHoursP; state.limitUP = m.limitUP; state.notified = m.notified;
     resetSnap(); persist();
+    if (!changes) { try { render(); } catch (e) {} }     // doar pragurile s-au schimbat: reafișează câmpul și totalurile
     return { changes, openChanged };
   }
   function refreshUI(openChanged) {
@@ -1182,7 +1191,7 @@
         else if (r.status === 401 || (r.status === 403 && r.headers.get('x-ratelimit-remaining') !== '0')) throw { auth: true };
         else throw { http: r.status };
         const L = localDoc();
-        const m = merge(L, remote || { tasks: [], deleted: {}, limitHours: L.limitHours, limitU: 0, notified: {} });
+        const m = merge(L, remote || { tasks: [], deleted: {}, limitHours: L.limitHours, limitU: 0, limitHoursP: L.limitHoursP, limitUP: 0, notified: {} });
         if (canon(m) !== canon(L)) { const a = applyMerged(m); totalChanges += a.changes; openChanged = openChanged || a.openChanged; }
         if (!remote || canon(m) !== canon(remote)) {
           const body = { message: 'sync ' + new Date().toISOString(), content: enc(JSON.stringify({ v: 1, savedAt: Date.now(), ...m })) };
