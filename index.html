@@ -39,7 +39,10 @@
   button.rep { display:flex; align-items:center; justify-content:center; width:48px; height:40px; padding:0; border-radius:10px; background:rgba(31,111,235,.12); color:var(--pri); font-size:13px; font-weight:500; flex:none; white-space:nowrap; }
   button#notifBtn { width:40px; height:40px; padding:0; flex:none; border-radius:10px; background:var(--card); border:1px solid var(--line); font-size:18px; }
   #rBack, #rMode .flt { height:40px; border-radius:10px; }
-  #rBack { padding:0 12px; }
+  #rBack { width:40px; padding:0; font-size:22px; line-height:1; }
+  #rPlan { font-size:18px; font-weight:700; white-space:nowrap; color:var(--txt); flex:1; text-align:center; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  #rStripe { height:4px; border-radius:2px; margin:-2px 4px 12px; }
+  @media (max-width:380px) { #rPlan { font-size:16px; } }
   #rMode .flt { padding:0 12px; font-size:13px; }
   button.ghost { background:transparent; color:var(--mut); padding:6px 10px; }
   button.sec { background:var(--bg); color:var(--txt); border:1px solid var(--line); }
@@ -261,10 +264,11 @@
 <div id="report" hidden>
   <main>
     <div class="dh">
-      <button class="sec" id="rBack">‹ Înapoi</button>
+      <button class="sec" id="rBack" aria-label="Înapoi">‹</button>
+      <div id="rPlan"></div>
       <div class="flts" id="rMode" style="margin:0"><button class="flt on" data-m="week">Săptămână</button><button class="flt" data-m="month">Lună</button></div>
     </div>
-    <div class="rh" id="rPlan"></div>
+    <div id="rStripe"></div>
     <div class="card">
       <div class="rnav"><button class="sec" id="rPrev" aria-label="Perioada anterioară">‹</button><b id="rLbl"></b><button class="sec" id="rNext" aria-label="Perioada următoare">›</button></div>
       <div id="rBody"></div>
@@ -677,7 +681,7 @@
     const dp = new Date(a + 'T12:00:00'); dp.setDate(dp.getDate() - 1);
     const [pa, pb] = repRange(repMode, ymd(dp));
     const s = repStats(a, b), p = repStats(pa, pb), body = $('rBody');
-    renderRepCats(a, b); $('rPlan').textContent = PLANS.find(x => x.k === curPlan).name;
+    renderRepCats(a, b); { const P = PLANS.find(x => x.k === curPlan); $('rPlan').textContent = P.name; $('rStripe').style.background = P.color; }
     if (!s.n) { body.innerHTML = '<div class="empty">Niciun task planificat în această perioadă.</div>'; $('rCats').innerHTML = ''; return; }
     const pv = k => p.n ? p[k] : null;
     const G = '#C0DD97', Y = '#FAC775', R = '#F7C1C1', B = '#B5D4F4', N = '#D3D1C7';
