@@ -468,7 +468,7 @@
     $('carryWrap').innerHTML = undone ? '<button class="sec" id="carry" style="width:100%;margin-bottom:12px">Mută cele nefinalizate pe ziua următoare</button>' : '';
     renderMeters(); renderWeek(); renderBanner();
   }
-  let lbMode = 'today', lbDays = 3, lbKey = '';
+  let lbMode = 'today', lbDays = 2, lbKey = '';
   const lbTarget = () => { const d = new Date(); d.setDate(d.getDate() + (lbMode === 'today' ? 0 : lbMode === 'tomorrow' ? 1 : Math.max(1, lbDays))); return ymd(d); };
   function renderBanner() {
     const el = $('leftBanner'), L = curDay === ymd(new Date()) ? leftovers() : [];
@@ -476,9 +476,10 @@
     const key = L.length + '|' + L[0].id + '|' + L[0].date;
     if (key !== lbKey) {   // nu redesenez la fiecare tick, ca să nu pierd cifra care se tastează
       lbKey = key;
-      el.innerHTML = '<div class="warnbar"><b></b><div class="s"></div><div class="s" style="margin-top:10px">Mută pe:</div>' +
-        '<div class="row" style="margin-top:6px"><button class="sec lbm" data-m="today">Astăzi</button><button class="sec lbm" data-m="tomorrow">Mâine</button></div>' +
-        '<div class="row" style="margin-top:8px;align-items:center;gap:8px"><span class="s" style="margin:0">După</span><input type="number" id="lbN" min="1" max="365" inputmode="numeric" style="width:70px;text-align:center"><span class="s" style="margin:0">zile</span><span class="s" id="lbTo" style="margin:0 0 0 auto"></span></div>' +
+      el.innerHTML = '<div class="warnbar"><b></b><div class="s"></div>' +
+        '<div class="row" style="margin-top:10px;justify-content:space-between"><span class="s" style="margin:0">Mută pe:</span><span class="s" id="lbTo" style="margin:0"></span></div>' +
+        '<div class="row" style="margin-top:6px;align-items:center;gap:6px;flex-wrap:nowrap"><button class="sec lbm" data-m="today" style="padding:8px 10px">Astăzi</button><button class="sec lbm" data-m="tomorrow" style="padding:8px 10px">Mâine</button>' +
+        '<span class="s" style="margin:0">peste</span><input type="number" id="lbN" min="1" max="365" inputmode="numeric" style="width:46px;padding:0 4px;text-align:center"><span class="s" style="margin:0">zile</span></div>' +
         '<div class="row" style="margin-top:10px"><button id="lbMove">Mută</button><button class="sec" id="lbSee">Vezi taskurile</button></div></div>';
       el.querySelector('b').textContent = (L.length === 1 ? '1 task nefinalizat' : L.length + ' taskuri nefinalizate') + ' din zile trecute';
       el.querySelector('.s').textContent = `Cel mai vechi: ${fmtShort(L[0].date)} · ${L[0].title}`;
