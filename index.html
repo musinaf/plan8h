@@ -468,12 +468,25 @@
     $('carryWrap').innerHTML = undone ? '<button class="sec" id="carry" style="width:100%;margin-bottom:12px">Mută cele nefinalizate pe ziua următoare</button>' : '';
     renderMeters(); renderWeek(); renderBanner();
   }
+  let lbMode = 'today', lbDays = 3, lbKey = '';
+  const lbTarget = () => { const d = new Date(); d.setDate(d.getDate() + (lbMode === 'today' ? 0 : lbMode === 'tomorrow' ? 1 : Math.max(1, lbDays))); return ymd(d); };
   function renderBanner() {
     const el = $('leftBanner'), L = curDay === ymd(new Date()) ? leftovers() : [];
-    if (!L.length) { el.innerHTML = ''; return; }
-    el.innerHTML = '<div class="warnbar"><b></b><div class="s"></div><div class="row" style="margin-top:8px"><button id="lbMove">Mută pe azi</button><button class="sec" id="lbSee">Vezi</button></div></div>';
-    el.querySelector('b').textContent = (L.length === 1 ? '1 task nefinalizat' : L.length + ' taskuri nefinalizate') + ' din zile trecute';
-    el.querySelector('.s').textContent = `Cel mai vechi: ${fmtShort(L[0].date)} · ${L[0].title}`;
+    if (!L.length) { el.innerHTML = ''; lbKey = ''; return; }
+    const key = L.length + '|' + L[0].id + '|' + L[0].date;
+    if (key !== lbKey) {   // nu redesenez la fiecare tick, ca să nu pierd cifra care se tastează
+      lbKey = key;
+      el.innerHTML = '<div class="warnbar"><b></b><div class="s"></div><div class="s" style="margin-top:10px">Mută pe:</div>' +
+        '<div class="row" style="margin-top:6px"><button class="sec lbm" data-m="today">Astăzi</button><button class="sec lbm" data-m="tomorrow">Mâine</button></div>' +
+        '<div class="row" style="margin-top:8px;align-items:center;gap:8px"><span class="s" style="margin:0">După</span><input type="number" id="lbN" min="1" max="365" inputmode="numeric" style="width:70px;text-align:center"><span class="s" style="margin:0">zile</span><span class="s" id="lbTo" style="margin:0 0 0 auto"></span></div>' +
+        '<div class="row" style="margin-top:10px"><button id="lbMove">Mută</button><button class="sec" id="lbSee">Vezi taskurile</button></div></div>';
+      el.querySelector('b').textContent = (L.length === 1 ? '1 task nefinalizat' : L.length + ' taskuri nefinalizate') + ' din zile trecute';
+      el.querySelector('.s').textContent = `Cel mai vechi: ${fmtShort(L[0].date)} · ${L[0].title}`;
+      $('lbN').value = lbDays;
+    }
+    for (const b of el.querySelectorAll('.lbm')) b.style.outline = b.dataset.m === lbMode ? '2px solid var(--pri)' : '';
+    $('lbN').style.outline = lbMode === 'days' ? '2px solid var(--pri)' : '';
+    $('lbTo').textContent = '= ' + fmtShort(lbTarget());
   }
 
   // ---- detalii task ----
@@ -698,10 +711,13 @@
   };
   $('flts').onclick = e => { const b = e.target.closest('.flt'); if (b) { filter = b.dataset.f; render(); } };
   $('leftBanner').onclick = e => {
-    const today = ymd(new Date()), L = leftovers();
-    if (e.target.closest('#lbMove')) { for (const t of L) { stopTask(t); moveTask(t, today); } save(); render(); checkThresholds(today); }
+    const L = leftovers(), m = e.target.closest('.lbm');
+    if (m) { lbMode = m.dataset.m; renderBanner(); }
+    else if (e.target.closest('#lbN')) { if (lbMode !== 'days') { lbMode = 'days'; renderBanner(); } }
+    else if (e.target.closest('#lbMove')) { const nd = lbTarget(); for (const t of L) { stopTask(t); moveTask(t, nd); } lbMode = 'today'; save(); render(); checkThresholds(nd); }
     else if (e.target.closest('#lbSee') && L.length) { curDay = L[0].date; render(); }
   };
+  $('leftBanner').oninput = e => { if (e.target.id === 'lbN') { lbDays = Math.max(1, parseInt(e.target.value, 10) || 1); lbMode = 'days'; renderBanner(); } };
   const shift = n => { const d = new Date(curDay + 'T12:00:00'); d.setDate(d.getDate() + n); curDay = ymd(d); render(); };
   $('prev').onclick = () => shift(-1);
   $('next').onclick = () => shift(1);
