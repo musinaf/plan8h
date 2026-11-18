@@ -91,6 +91,14 @@
   .big { width:100%; font-size:17px; padding:14px; }
   .big.on { background:var(--warn); }
   .err { color:#d33; font-size:13px; }
+  .cm { padding:10px 0; border-top:1px solid var(--line); }
+  .cm:first-child { border-top:0; }
+  .cm .mt { display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--mut); margin-bottom:3px; }
+  .cm .mt button { padding:4px 8px; font-size:14px; }
+  .cm .tx { white-space:pre-wrap; overflow-wrap:anywhere; }
+  .cm .ced { background:rgba(31,111,235,.10); border-radius:10px; padding:10px; }
+  .cm .ced textarea { min-height:80px; background:var(--card); }
+  .cm .eb { display:flex; gap:8px; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -190,8 +198,10 @@
     </div>
 
     <div class="card">
-      <h3 style="margin-top:0">Notițe</h3>
-      <textarea id="dNotes" placeholder="Scrie aici detalii, link-uri, ce ai de făcut…"></textarea>
+      <h3 style="margin-top:0">Comentarii</h3>
+      <textarea id="cNew" placeholder="Scrie un comentariu…" style="min-height:70px"></textarea>
+      <div class="row" style="margin-top:8px"><button id="cAdd">Adaugă</button><span class="err" id="cErr"></span></div>
+      <div id="cList" style="margin-top:8px"></div>
     </div>
 
     <div class="card">
@@ -237,8 +247,13 @@
         if (t.startedAt) t.sessions.push({ s: t.startedAt, e: null });
       }
       delete t.workedSec; delete t.startedAt;
-      t.notes = t.notes || '';
       t.estMin = t.estMin || 0;
+      if (!Array.isArray(t.comments)) t.comments = [];
+      if (t.notes && String(t.notes).trim()) {       // vechea notiță devine primul comentariu (id fix, ca să nu se dubleze între dispozitive)
+        const nid = 'n-' + t.id;
+        if (!t.comments.some(c => c.id === nid)) t.comments.push({ id: nid, txt: String(t.notes).trim(), ts: t.u || now });
+      }
+      delete t.notes;
     }
     return s;
   }
@@ -373,7 +388,8 @@
         <input type="checkbox" ${t.done ? 'checked' : ''} aria-label="Gata">
         <div class="t"><b></b><small><span class="w">${fmtSec(workedSec(t))}</span> / ${fmtMin(t.estMin)}</small></div>
         <button class="play ${run ? 'on' : ''}" aria-label="${run ? 'Pauză' : 'Start'}">${run ? '⏸' : '▶'}</button>`;
-      el.querySelector('b').textContent = t.title + (t.notes ? ' 📝' : '');
+      const nc = visComments(t).length;
+      el.querySelector('b').textContent = t.title + (nc ? ' 💬 ' + nc : '');
       list.appendChild(el);
     }
     const undone = ts.filter(t => !t.done).length;
@@ -390,9 +406,9 @@
     $('dH').value = Math.floor(t.estMin / 60);
     $('dM').value = t.estMin % 60;
     $('dDate').value = t.date;
-    $('dNotes').value = t.notes;
-    $('dErr').textContent = ''; editIdx = null;
-    renderDetail(true);
+    $('dErr').textContent = ''; editIdx = null; editingC = null;
+    $('cNew').value = ''; $('cErr').textContent = '';
+    renderDetail(true); renderComments();
     $('detail').hidden = false;
     $('detail').scrollTop = 0;
     try { history.pushState({ d: 1 }, ''); } catch (e) {}
@@ -421,7 +437,31 @@
     const k = ymd(new Date(ms)); if (k === taskDate) return '';
     return (k === ymd(new Date()) ? 'Azi' : k === ymd(new Date(Date.now() - 864e5)) ? 'Ieri' : fmtDay(k)) + ' · ';
   };
-  let editIdx = null, undo = null, undoTimer = null;
+  let editIdx = null, undo = null, undoTimer = null, editingC = null;
+
+  // ---- comentarii ----
+  const MON = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const fmtStamp = ms => { const d = new Date(ms); return `${d.getDate()} ${MON[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''} · ${fmtHM(ms)}`; };
+  const visComments = t => (t.comments || []).filter(c => !c.del).sort((a, b) => b.ts - a.ts);
+  function renderComments() {
+    const t = cur(), box = $('cList'); if (!t) return;
+    box.innerHTML = '';
+    const list = visComments(t);
+    if (!list.length) { box.innerHTML = '<div class="empty">Niciun comentariu încă.</div>'; return; }
+    for (const c of list) {
+      const el = document.createElement('div'); el.className = 'cm'; el.dataset.id = c.id;
+      const meta = fmtStamp(c.ts) + (c.ed ? ' · editat' : '');
+      if (editingC === c.id) {
+        el.innerHTML = `<div class="ced"><div class="mt" style="color:var(--pri);font-weight:600"><span>Editezi comentariul din ${meta.replace(' · editat', '')}</span></div>
+          <textarea class="cta"></textarea><div class="err cer"></div><div class="eb"><button class="cs">Salvează</button><button class="sec cc">Anulează</button></div></div>`;
+        el.querySelector('.cta').value = c.txt;
+      } else {
+        el.innerHTML = `<div class="mt"><span>${meta}</span><span><button class="ghost ce" aria-label="Editează">✎</button><button class="ghost cd" aria-label="Șterge">✕</button></span></div><div class="tx"></div>`;
+        el.querySelector('.tx').textContent = c.txt;
+      }
+      box.appendChild(el);
+    }
+  }
   function renderSessions() {
     const t = cur(), box = $('dSess'); box.innerHTML = '';
     $('dTot').textContent = fmtSec(workedSec(t));
@@ -450,7 +490,30 @@
 
   $('dBack').onclick = () => { try { history.back(); } catch (e) { closeDetail(); } setTimeout(() => { if (!$('detail').hidden) closeDetail(); }, 50); };
   $('dTitle').oninput = e => { const t = cur(); if (t) { t.title = e.target.value; save(); } };
-  $('dNotes').oninput = e => { const t = cur(); if (t) { t.notes = e.target.value; save(); } };
+  $('cAdd').onclick = () => {
+    const t = cur(); if (!t) return;
+    const txt = $('cNew').value.trim();
+    if (!txt) { $('cErr').textContent = 'Scrie ceva înainte să adaugi.'; return; }
+    $('cErr').textContent = ''; t.comments.push({ id: uid(), txt, ts: Date.now() });
+    $('cNew').value = ''; save(); renderComments();
+  };
+  $('cNew').oninput = () => { $('cErr').textContent = ''; };
+  $('cList').onclick = e => {
+    const t = cur(), row = e.target.closest('.cm'); if (!t || !row) return;
+    const c = t.comments.find(x => x.id === row.dataset.id); if (!c) return;
+    if (e.target.closest('.ce')) { editingC = c.id; renderComments(); const ta = $('cList').querySelector('.cta'); if (ta) ta.focus(); }
+    else if (e.target.closest('.cc')) { editingC = null; renderComments(); }
+    else if (e.target.closest('.cs')) {
+      const txt = row.querySelector('.cta').value.trim();
+      if (!txt) { row.querySelector('.cer').textContent = 'Comentariul nu poate fi gol.'; return; }
+      if (txt !== c.txt) { c.txt = txt; c.ed = Date.now(); }
+      editingC = null; save(); renderComments();
+    }
+    else if (e.target.closest('.cd')) {
+      if (!confirm('Ștergi comentariul?')) return;
+      c.del = Date.now(); c.txt = ''; save(); renderComments();
+    }
+  };
   const onEst = () => {
     const t = cur(); if (!t) return;
     t.estMin = (parseInt($('dH').value) || 0) * 60 + (parseInt($('dM').value) || 0);
@@ -472,7 +535,8 @@
   };
   $('dDup').onclick = () => {
     const t = cur(); if (!t) return;
-    state.tasks.push({ id: uid(), title: t.title + ' (copie)', estMin: t.estMin, date: t.date, done: false, notes: t.notes, sessions: [] });
+    state.tasks.push({ id: uid(), title: t.title + ' (copie)', estMin: t.estMin, date: t.date, done: false,
+      comments: JSON.parse(JSON.stringify(visComments(t))), sessions: [] });
     save(); checkThresholds(t.date); $('dErr').textContent = 'Task duplicat pe aceeași zi.';
   };
   $('dAddSess').onclick = () => {
@@ -515,7 +579,7 @@
     const title = $('title').value.trim();
     const est = (parseInt($('h').value) || 0) * 60 + (parseInt($('m').value) || 0);
     if (!title) return;
-    state.tasks.push({ id: uid(), title, estMin: est, date: curDay, done: false, notes: '', sessions: [] });
+    state.tasks.push({ id: uid(), title, estMin: est, date: curDay, done: false, comments: [], sessions: [] });
     $('title').value = '';
     save(); render(); checkThresholds(curDay);
   };
@@ -586,13 +650,24 @@
     const s = migrate({ tasks: Array.isArray(d.tasks) ? d.tasks : [], limitHours: d.limitHours, notified: d.notified || {} });
     return { tasks: s.tasks, deleted: d.deleted || {}, limitHours: s.limitHours, limitU: d.limitU || 0, notified: s.notified };
   }
-  // Pe fiecare task rămâne versiunea cu `u` mai mare; ștergerile se propagă; notificările deja trimise se unesc.
+  const cmod = c => Math.max(c.ts || 0, c.ed || 0, c.del || 0);
+  function mergeComments(a, b) {
+    const m = {};
+    for (const c of [...(a || []), ...(b || [])]) { const o = m[c.id]; if (!o || cmod(c) > cmod(o)) m[c.id] = c; }
+    const cut = Date.now() - 60 * 864e5;
+    return Object.values(m).filter(c => !(c.del && c.del < cut)).sort((x, y) => x.ts - y.ts || (x.id < y.id ? -1 : 1));
+  }
+  // Pe fiecare task rămâne versiunea cu `u` mai mare (comentariile se unesc); ștergerile se propagă; notificările deja trimise se unesc.
   function merge(L, R) {
     const del = { ...R.deleted };
     for (const k in L.deleted) del[k] = Math.max(del[k] || 0, L.deleted[k]);
     const map = {};
     for (const t of R.tasks) map[t.id] = t;
-    for (const t of L.tasks) { const r = map[t.id]; if (!r || (t.u || 0) > (r.u || 0)) map[t.id] = t; }
+    for (const t of L.tasks) {
+      const r = map[t.id]; if (!r) { map[t.id] = t; continue; }
+      const win = (t.u || 0) > (r.u || 0) ? t : r, lose = win === t ? r : t;
+      map[t.id] = { ...win, comments: mergeComments(win.comments, lose.comments) };   // comentariile se unesc, nu se pierd
+    }
     const tasks = [];
     for (const id in map) { const t = map[id]; if (del[id] && del[id] >= (t.u || 0)) continue; tasks.push(t); }
     const cut = Date.now() - 60 * 864e5;
@@ -607,12 +682,13 @@
         if ((ln[d] && ln[d].worked) || (rn[d] && rn[d].worked)) o.worked = true; notified[d] = o;
       }
     }
+    tasks.sort((a, b) => a.id < b.id ? -1 : 1);       // aceeași ordine pe toate dispozitivele (id-ul începe cu ora creării)
     return { tasks, deleted: del, limitHours: lu.limitHours, limitU: lu.limitU || 0, notified };
   }
   function applyMerged(m) {
     const Lmap = {}; for (const t of state.tasks) Lmap[t.id] = t;
     const ids = new Set(); let changes = 0, openChanged = false;
-    for (const t of m.tasks) { ids.add(t.id); const l = Lmap[t.id]; if (!l || l.u !== t.u) { changes++; if (t.id === openId) openChanged = true; } }
+    for (const t of m.tasks) { ids.add(t.id); const l = Lmap[t.id]; if (!l || stable(l) !== stable(t)) { changes++; if (t.id === openId) openChanged = true; } }
     for (const id in Lmap) if (!ids.has(id)) { changes++; if (id === openId) openChanged = true; }
     state.tasks = m.tasks; state.deleted = m.deleted; state.limitHours = m.limitHours; state.limitU = m.limitU; state.notified = m.notified;
     resetSnap(); persist();
@@ -624,9 +700,10 @@
     const t = cur();
     if (!t) { $('detail').hidden = true; openId = null; render(); return; }
     const a = document.activeElement, set = (el, v) => { if (a !== el) el.value = v; };
-    set($('dTitle'), t.title); set($('dH'), Math.floor(t.estMin / 60)); set($('dM'), t.estMin % 60); set($('dDate'), t.date); set($('dNotes'), t.notes);
+    set($('dTitle'), t.title); set($('dH'), Math.floor(t.estMin / 60)); set($('dM'), t.estMin % 60); set($('dDate'), t.date);
     if (openChanged) editIdx = null;
     renderDetail(true);
+    if (editingC == null) renderComments();
   }
   function showSyncToast(n) {
     const el = $('syncToast');
