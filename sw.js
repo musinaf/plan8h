@@ -1,4 +1,4 @@
-const CACHE = 'plan8h-v26';
+const CACHE = 'plan8h-v28';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -12,7 +12,7 @@ self.addEventListener('fetch', e => {
   // doar fișierele aplicației; apelurile către GitHub (date, token) nu trec prin cache
   if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, { cache: 'no-cache' }).then(r => {   // revalidează mereu: versiunile noi apar imediat, nu după cache-ul de 10 min al GitHub Pages
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
       return r;
