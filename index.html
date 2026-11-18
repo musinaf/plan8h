@@ -16,9 +16,9 @@
   body { margin:0; font:16px/1.4 system-ui,-apple-system,Roboto,sans-serif; background:var(--bg); color:var(--txt);
          padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
   main { max-width:560px; margin:0 auto; padding:12px; }
-  h1 { font-size:20px; margin:8px 4px 12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:nowrap; gap:8px; white-space:nowrap; }
+  h1 { font-size:20px; margin:8px 4px 12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:nowrap; gap:6px; white-space:nowrap; }
   .hr { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; flex:1 1 auto; min-width:0; justify-content:flex-end; }
-  button.chip { padding:0 10px; height:40px; font-size:13px; border-radius:10px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:0 1 auto; font-weight:500; background:rgba(26,157,85,.15); color:var(--ok); }
+  button.chip { padding:0 8px; height:40px; font-size:13px; border-radius:10px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:0 1 auto; font-weight:500; background:rgba(26,157,85,.15); color:var(--ok); }
   button.chip.w { background:rgba(224,138,0,.18); color:var(--warn); }
   button.chip.n { background:var(--card); color:var(--mut); border:1px solid var(--line); }
   #syncToast { position:fixed; left:12px; right:12px; bottom:calc(14px + env(safe-area-inset-bottom)); max-width:536px; margin:0 auto;
@@ -35,7 +35,7 @@
     width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
   textarea { resize:vertical; min-height:110px; }
   button { border:0; border-radius:10px; padding:10px 14px; background:var(--pri); color:#fff; cursor:pointer; }
-  button.rep { display:flex; align-items:center; gap:6px; height:40px; padding:0 10px; border-radius:10px; background:rgba(31,111,235,.12); color:var(--pri); font-size:13px; font-weight:500; flex:none; white-space:nowrap; }
+  button.rep { display:flex; align-items:center; gap:5px; height:40px; padding:0 8px; border-radius:10px; background:rgba(31,111,235,.12); color:var(--pri); font-size:13px; font-weight:500; flex:none; white-space:nowrap; }
   button#notifBtn { width:40px; height:40px; padding:0; flex:none; border-radius:10px; background:var(--card); border:1px solid var(--line); font-size:18px; }
   #rBack, #rMode .flt { height:40px; border-radius:10px; }
   #rBack { padding:0 12px; }
@@ -152,11 +152,25 @@
   .rh { font-size:12px; font-weight:600; margin:2px 4px 8px; }
   .errbar { background:#FCEBEB; border:1px solid #F09595; color:#791F1F; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:14px; }
   .errbar[hidden] { display:none; }
+  main { position:relative; }
+  button.plan { display:flex; align-items:center; gap:2px; height:40px; padding:0 2px 0 0; background:transparent; color:var(--txt); font-size:18px; font-weight:700; white-space:nowrap; flex:none; border-radius:10px; }
+  #planStripe { height:4px; border-radius:2px; margin:-6px 4px 12px; }
+  .planmenu { position:absolute; left:12px; z-index:20; width:260px; max-width:calc(100% - 24px); background:var(--card); border:1px solid var(--line); border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.18); overflow:hidden; }
+  .planmenu[hidden] { display:none; }
+  .planmenu button { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:12px; background:transparent; color:var(--txt); border-radius:0; border-top:1px solid var(--line); }
+  .planmenu button:first-child { border-top:0; }
+  .planmenu button.on { background:var(--bg); }
+  .planmenu .dot { width:12px; height:12px; border-radius:4px; flex:none; }
+  .planmenu b { display:block; font-size:15px; font-weight:600; }
+  .planmenu small { display:block; font-size:12px; color:var(--txt); }
+  .planmenu .ck { margin-left:auto; font-weight:700; }
 </style>
 </head>
 <body>
 <main id="home">
-  <h1>Plan zilnic <span class="hr"><button class="chip n" id="syncChip">Fără sincronizare</button><button class="rep" id="repBtn" aria-label="Raport"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><rect x="5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="16" y="9" width="3" height="8" rx="1"/></svg>Raport</button><button class="ghost" id="notifBtn" aria-label="Activează notificările" title="Activează notificările">🔔</button></span></h1>
+  <h1><button class="plan" id="planBtn" aria-haspopup="true" aria-expanded="false"><span id="planName">Work Plan</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><span class="hr"><button class="chip n" id="syncChip">Fără sincronizare</button><button class="rep" id="repBtn" aria-label="Raport"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><rect x="5" y="11" width="3" height="6" rx="1"/><rect x="10.5" y="6" width="3" height="11" rx="1"/><rect x="16" y="9" width="3" height="8" rx="1"/></svg>Raport</button><button class="ghost" id="notifBtn" aria-label="Activează notificările" title="Activează notificările">🔔</button></span></h1>
+  <div id="planMenu" class="planmenu" hidden></div>
+  <div id="planStripe"></div>
 
   <div class="errbar" id="saveWarn" hidden></div>
   <div id="leftBanner"></div>
@@ -236,6 +250,7 @@
       <button class="sec" id="rBack">‹ Înapoi</button>
       <div class="flts" id="rMode" style="margin:0"><button class="flt on" data-m="week">Săptămână</button><button class="flt" data-m="month">Lună</button></div>
     </div>
+    <div class="rh" id="rPlan"></div>
     <div class="card">
       <div class="rnav"><button class="sec" id="rPrev" aria-label="Perioada anterioară">‹</button><b id="rLbl"></b><button class="sec" id="rNext" aria-label="Perioada următoare">›</button></div>
       <div id="rBody"></div>
@@ -343,6 +358,7 @@
       if (!t.orig) t.orig = t.date;
       if (!Array.isArray(t.moves)) t.moves = [];
       if (!['u', 'i', 'o'].includes(t.cat)) t.cat = 'i';
+      if (!['w', 'p'].includes(t.plan)) t.plan = 'w';
       if (t.doneAt === undefined) t.doneAt = null;
       if (!Array.isArray(t.comments)) t.comments = [];
       if (t.notes && String(t.notes).trim()) {       // vechea notiță devine primul comentariu (id fix, ca să nu se dubleze între dispozitive)
@@ -397,14 +413,17 @@
   const workedSec = t => t.sessions.reduce((a, x) => a + Math.max(0, sessSec(x)), 0);
   const isRunning = t => t.sessions.some(x => x.e == null);
   const limitMin = () => state.limitHours * 60;
-  const dayTasks = d => state.tasks.filter(t => t.date === d);
-  const plannedMin = d => dayTasks(d).reduce((s, t) => s + t.estMin, 0);
+  const PLANS = [{ k: 'w', name: 'Work Plan', color: '#B5D4F4' }, { k: 'p', name: 'Personal Plan', color: '#C0DD97' }];
+  let curPlan = 'w';
+  try { const sp = localStorage.getItem('plan8h.plan'); if (sp === 'w' || sp === 'p') curPlan = sp; } catch (e) {}
+  const dayTasks = (d, pl = curPlan) => state.tasks.filter(t => t.date === d && t.plan === pl);
+  const plannedMin = (d, pl = curPlan) => dayTasks(d, pl).reduce((s, t) => s + t.estMin, 0);
   // Timpul lucrat într-o zi = intervalele (ale tuturor taskurilor) care cad în acea zi; un interval peste miezul nopții se împarte pe cele două zile.
-  const workedMin = d => {
+  const workedMin = (d, pl = curPlan) => {
     const a = new Date(d + 'T00:00:00'), b = new Date(a); b.setDate(b.getDate() + 1);
     const A = a.getTime(), B = b.getTime(), now = Date.now();
     let ms = 0;
-    for (const t of state.tasks) for (const x of t.sessions) ms += Math.max(0, Math.min(x.e == null ? now : x.e, B) - Math.max(x.s, A));
+    for (const t of state.tasks) if (t.plan === pl) for (const x of t.sessions) ms += Math.max(0, Math.min(x.e == null ? now : x.e, B) - Math.max(x.s, A));
     return ms / 60000;
   };
   const toLocalInput = ms => { const d = new Date(ms); return `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -421,9 +440,9 @@
   function moveTask(t, nd) { if (!nd || nd === t.date) return; t.moves.push({ from: t.date, to: nd, at: Date.now() }); t.date = nd; }
   function setDone(t, v) { t.done = !!v; t.doneAt = v ? Date.now() : null; if (v) stopTask(t); }
   const CATS = [{ k: 'u', name: 'Urgent', color: '#F7C1C1' }, { k: 'i', name: 'Important', color: '#FAC775' }, { k: 'o', name: 'Opțional', color: '#C0DD97' }];
-  const newTask = (title, estMin, date, comments, cat) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [], sdel: {}, cat: cat || 'i' });
+  const newTask = (title, estMin, date, comments, cat, plan) => ({ id: uid(), title, estMin, date, done: false, doneAt: null, created: Date.now(), orig: date, moves: [], comments: comments || [], sessions: [], sdel: {}, cat: cat || 'i', plan: plan || curPlan });
   // taskuri nefinalizate rămase pe zile trecute, cele mai vechi primele
-  const leftovers = () => { const today = ymd(new Date()); return state.tasks.filter(t => !t.done && t.date < today).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.created || 0) - (b.created || 0)); };
+  const leftovers = (pl = curPlan) => { const today = ymd(new Date()); return state.tasks.filter(t => t.plan === pl && !t.done && t.date < today).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.created || 0) - (b.created || 0)); };
 
   function stopAll() {
     const now = Date.now();
@@ -457,32 +476,38 @@
     const lim = limitMin(), lh = state.limitHours;
     const days = new Set([today]);
     if (extraDay && extraDay >= today) days.add(extraDay);
-    for (const d of days) {
-      const n = state.notified[d] || (state.notified[d] = {});
-      if (!n.planned && plannedMin(d) >= lim) {
-        n.planned = true; save();
-        notify('Ai planificat ' + lh + 'h pentru ' + (d === today ? 'azi' : fmtDay(d)),
-               'Timpul estimat al task-urilor a atins ' + fmtMin(plannedMin(d)) + '. Nu mai adăuga altele.', 'planned-' + d);
+    // cele 8 ore se socotesc separat pe fiecare plan; notificările vin indiferent care plan e deschis
+    for (const P of PLANS) {
+      const sf = P.k === 'w' ? '' : '_' + P.k, pre = P.k === 'w' ? '' : P.name + ': ';
+      for (const d of days) {
+        const n = state.notified[d] || (state.notified[d] = {});
+        if (!n['planned' + sf] && plannedMin(d, P.k) >= lim) {
+          n['planned' + sf] = true; save();
+          notify(pre + 'Ai planificat ' + lh + 'h pentru ' + (d === today ? 'azi' : fmtDay(d)),
+                 'Timpul estimat al task-urilor a atins ' + fmtMin(plannedMin(d, P.k)) + '. Nu mai adăuga altele.', 'planned' + sf + '-' + d);
+        }
       }
-    }
-    const n = state.notified[today];
-    // notificarea „lucrat" vine doar de pe dispozitivul pe care rulează cronometrul (sau de pe oricare, dacă nu rulează niciunul)
-    const anyRun = state.tasks.some(isRunning);
-    const mine = state.tasks.some(t => t.sessions.some(x => x.e == null && (!x.dev || x.dev === DEV)));
-    if (!n.worked && workedMin(today) >= lim && (mine || !anyRun)) {
-      n.worked = true; save();
-      notify('Ai lucrat ' + lh + ' ore azi', 'Timpul lucrat a atins ' + fmtMin(workedMin(today)) + '. Ia o pauză.', 'worked-' + today);
+      const n = state.notified[today] || (state.notified[today] = {});
+      // notificarea „lucrat" vine doar de pe dispozitivul pe care rulează cronometrul (sau de pe oricare, dacă nu rulează niciunul)
+      const anyRun = state.tasks.some(isRunning);
+      const mine = state.tasks.some(t => t.sessions.some(x => x.e == null && (!x.dev || x.dev === DEV)));
+      if (!n['worked' + sf] && workedMin(today, P.k) >= lim && (mine || !anyRun)) {
+        n['worked' + sf] = true; save();
+        notify(pre + 'Ai lucrat ' + lh + ' ore azi', 'Timpul lucrat a atins ' + fmtMin(workedMin(today, P.k)) + '. Ia o pauză.', 'worked' + sf + '-' + today);
+      }
     }
   }
   // O singură notificare pe zi pentru taskurile rămase din zile trecute; așteaptă prima sincronizare ca să nu se dubleze între dispozitive.
   function checkLeftover() {
     if (!syncedOnce) return;
-    const L = leftovers(); if (!L.length) return;
-    const today = ymd(new Date()), n = state.notified[today] || (state.notified[today] = {});
-    if (n.leftover) return;
-    n.leftover = true; save();
-    notify(L.length === 1 ? '1 task rămas din zile trecute' : L.length + ' taskuri rămase din zile trecute',
-           'Cel mai vechi e din ' + fmtShort(L[0].date) + '. Deschide aplicația ca să le muți pe azi sau să le termini.', 'leftover-' + today);
+    for (const P of PLANS) {
+      const L = leftovers(P.k); if (!L.length) continue;
+      const sf = P.k === 'w' ? '' : '_' + P.k, today = ymd(new Date()), n = state.notified[today] || (state.notified[today] = {});
+      if (n['leftover' + sf]) continue;
+      n['leftover' + sf] = true; save();
+      notify((P.k === 'w' ? '' : P.name + ': ') + (L.length === 1 ? '1 task rămas din zile trecute' : L.length + ' taskuri rămase din zile trecute'),
+             'Cel mai vechi e din ' + fmtShort(L[0].date) + '. Deschide aplicația ca să le muți pe azi sau să le termini.', 'leftover' + sf + '-' + today);
+    }
   }
 
   // ---- randare listă ----
@@ -608,7 +633,7 @@
   }
   // taskurile sunt grupate după data planificată inițial (orig)
   function repStats(a, b, cat) {
-    const ts = state.tasks.filter(t => t.orig >= a && t.orig <= b && (!cat || t.cat === cat)), n = ts.length;
+    const ts = state.tasks.filter(t => t.orig >= a && t.orig <= b && (!cat || t.cat === cat) && t.plan === curPlan), n = ts.length;
     if (!n) return { n: 0 };
     const done = ts.filter(t => t.done);
     const same = done.filter(t => t.doneAt && ymd(new Date(t.doneAt)) <= t.orig).length;
@@ -639,7 +664,7 @@
     const dp = new Date(a + 'T12:00:00'); dp.setDate(dp.getDate() - 1);
     const [pa, pb] = repRange(repMode, ymd(dp));
     const s = repStats(a, b), p = repStats(pa, pb), body = $('rBody');
-    renderRepCats(a, b);
+    renderRepCats(a, b); $('rPlan').textContent = PLANS.find(x => x.k === curPlan).name;
     if (!s.n) { body.innerHTML = '<div class="empty">Niciun task planificat în această perioadă.</div>'; $('rCats').innerHTML = ''; return; }
     const pv = k => p.n ? p[k] : null;
     const G = '#C0DD97', Y = '#FAC775', R = '#F7C1C1', B = '#B5D4F4', N = '#D3D1C7';
@@ -812,7 +837,7 @@
   };
   $('dDup').onclick = () => {
     const t = cur(); if (!t) return;
-    state.tasks.push(newTask(t.title + ' (copie)', t.estMin, t.date, JSON.parse(JSON.stringify(visComments(t))), t.cat));
+    state.tasks.push(newTask(t.title + ' (copie)', t.estMin, t.date, JSON.parse(JSON.stringify(visComments(t))), t.cat, t.plan));
     save(); checkThresholds(t.date); $('dErr').textContent = 'Task duplicat pe aceeași zi.';
   };
   $('dAddSess').onclick = () => {
@@ -886,6 +911,34 @@
   $('catSel').onclick = e => { const b = e.target.closest('button'); if (b) { newCat = b.dataset.c; showNewCat(); } };
   $('dCat').onclick = e => { const b = e.target.closest('button'), t = cur(); if (b && t && t.cat !== b.dataset.c) { t.cat = b.dataset.c; save(); renderDetail(false); } };
   showNewCat();
+  const planMenu = $('planMenu');
+  function renderPlanUI() {
+    const P = PLANS.find(x => x.k === curPlan);
+    $('planName').textContent = P.name; $('planStripe').style.background = P.color;
+    document.title = P.name;
+  }
+  function openPlanMenu() {
+    const today = ymd(new Date());
+    planMenu.innerHTML = '';
+    for (const p of PLANS) {
+      const ts = state.tasks.filter(t => t.plan === p.k && t.date === today), open = ts.filter(t => !t.done).length;
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.p = p.k; b.className = p.k === curPlan ? 'on' : '';
+      b.innerHTML = `<span class="dot" style="background:${p.color}"></span><span><b>${p.name}</b><small>${ts.length ? ts.length + (ts.length === 1 ? ' task' : ' taskuri') + ' azi · ' + open + ' nefinalizate' : 'niciun task azi'}</small></span>${p.k === curPlan ? '<span class="ck">✓</span>' : ''}`;
+      planMenu.appendChild(b);
+    }
+    const h1 = document.querySelector('h1'); planMenu.style.top = (h1.offsetTop + h1.offsetHeight + 2) + 'px';
+    planMenu.hidden = false; $('planBtn').setAttribute('aria-expanded', 'true');
+  }
+  const closePlanMenu = () => { planMenu.hidden = true; $('planBtn').setAttribute('aria-expanded', 'false'); };
+  $('planBtn').onclick = e => { e.stopPropagation(); planMenu.hidden ? openPlanMenu() : closePlanMenu(); };
+  planMenu.onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    curPlan = b.dataset.p; try { localStorage.setItem('plan8h.plan', curPlan); } catch (er) {}
+    filter = 'all'; closePlanMenu(); renderPlanUI(); render();
+  };
+  document.addEventListener('click', e => { if (!planMenu.hidden && !e.target.closest('#planMenu')) closePlanMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePlanMenu(); });
+  renderPlanUI();
   $('repBtn').onclick = openReport;
   $('rBack').onclick = () => { try { history.back(); } catch (e) { closeReport(); } setTimeout(() => { if (!$('report').hidden) closeReport(); }, 50); };
   $('rPrev').onclick = () => { repShift(-1); renderReport(); };
@@ -944,7 +997,7 @@
   const enc = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(bin); };
   const dec = b => { const bin = atob(b.replace(/\s/g, '')); return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))); };
   const stable = o => JSON.stringify(o, (k, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.keys(v).sort().reduce((a, x) => (a[x] = v[x], a), {}) : v);
-  const NKEYS = ['planned', 'worked', 'leftover'];
+  const NKEYS = ['planned', 'worked', 'leftover', 'planned_p', 'worked_p', 'leftover_p'];
   const cleanNotified = n => { const o = {}; for (const d in (n || {})) if (n[d] && NKEYS.some(k => n[d][k])) o[d] = n[d]; return o; };
   const canon = d => stable({ tasks: [...d.tasks].sort((a, b) => a.id < b.id ? -1 : 1), deleted: d.deleted, limitHours: d.limitHours, limitU: d.limitU || 0, notified: cleanNotified(d.notified) });
   const localDoc = () => ({ tasks: state.tasks, deleted: state.deleted, limitHours: state.limitHours, limitU: state.limitU, notified: state.notified });
