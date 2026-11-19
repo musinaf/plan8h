@@ -1,4 +1,4 @@
-const CACHE = 'plan8h-v30';
+const CACHE = 'plan8h-v31';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

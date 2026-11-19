@@ -88,6 +88,8 @@
   .ed .f { display:flex; gap:6px; align-items:center; margin-top:8px; }
   .ed .f span { flex:none; width:50px; color:var(--mut); font-size:13px; }
   .ed .f input[type=date] { flex:1; min-width:0; }
+  .ed .f input.tm24 { text-align:center; font-size:16px; color:var(--txt); }
+  .ed .f input.tm24.bad { border-color:#A32D2D; background:#FCEBEB; }
   .ed .f input[type=time] { flex:none; width:114px; padding:10px 6px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
   .ed .f input[type=date] { background:var(--card); }
   .ed .eb { display:flex; gap:8px; margin-top:10px; }
@@ -796,8 +798,8 @@
       if (editIdx === i) {
         const ds = ymd(new Date(x.s)), hs = fmtHM(x.s);
         html += `<div class="ed"><div class="et">Editezi intervalul</div>
-          <div class="f"><span>Început</span><input type="date" class="fsd" value="${ds}"><input type="time" class="fst" value="${hs}"></div>` +
-          (run ? '' : `<div class="f"><span>Sfârșit</span><input type="date" class="fed" value="${ymd(new Date(x.e))}"><input type="time" class="fet" value="${fmtHM(x.e)}"></div>`) +
+          <div class="f"><span>Început</span><input type="date" class="fsd" value="${ds}"><input type="text" class="fst tm24" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" aria-label="Ora de început (24h)" value="${hs}" data-old="${hs}"></div>` +
+          (run ? '' : `<div class="f"><span>Sfârșit</span><input type="date" class="fed" value="${ymd(new Date(x.e))}"><input type="text" class="fet tm24" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="HH:MM" aria-label="Ora de sfârșit (24h)" value="${fmtHM(x.e)}" data-old="${fmtHM(x.e)}"></div>`) +
           `<div class="eb"><button class="sv">Salvează</button><button class="sec cn">Anulează</button></div></div>`;
       }
       el.innerHTML = html;
@@ -873,9 +875,11 @@
     }
     if (e.target.closest('.cn')) { editIdx = null; $('dErr').textContent = ''; renderSessions(); return; }
     if (e.target.closest('.sv')) {
-      const s = new Date(row.querySelector('.fsd').value + 'T' + row.querySelector('.fst').value).getTime();
+      const fs = row.querySelector('.fst'), fe = row.querySelector('.fet'), hs = normHM(fs.value), he = fe ? normHM(fe.value) : null;
+      if (!hs || (fe && !he)) { (!hs ? fs : fe).classList.add('bad'); $('dErr').textContent = 'Ora trebuie să fie în format 24h, de exemplu 14:15.'; return; }
+      const s = new Date(row.querySelector('.fsd').value + 'T' + hs).getTime();
       const ed = row.querySelector('.fed');
-      const en = ed ? new Date(ed.value + 'T' + row.querySelector('.fet').value).getTime() : null;
+      const en = ed ? new Date(ed.value + 'T' + he).getTime() : null;
       if (isNaN(s) || (ed && (isNaN(en) || en <= s)) || (!ed && s >= Date.now())) {
         $('dErr').textContent = 'Sfârșitul trebuie să fie după început.'; return;
       }
@@ -886,6 +890,18 @@
     if (e.target.closest('.ed')) return;                  // click în editor: nu închide
     if (e.target.closest('.sr')) { editIdx = editIdx === i ? null : i; $('dErr').textContent = ''; renderSessions(); }
   };
+  // ora în format 24h: câmp propriu, independent de setările telefonului
+  const normHM = v => { const m = /^(\d{1,2}):?(\d{2})$/.exec(String(v).trim()); if (!m) return null; const hh = +m[1], mm = +m[2]; return hh < 24 && mm < 60 ? pad(hh) + ':' + pad(mm) : null; };
+  document.addEventListener('input', e => {
+    const el = e.target; if (!el.classList || !el.classList.contains('tm24')) return;
+    const d = el.value.replace(/\D/g, '').slice(0, 4); el.value = d.length === 4 ? d.slice(0, 2) + ':' + d.slice(2) : d;   // 3 cifre (945) se completează la ieșire: 09:45 el.classList.remove('bad');
+  });
+  document.addEventListener('focusout', e => {
+    const el = e.target; if (!el.classList || !el.classList.contains('tm24')) return;
+    const v = normHM(el.value);
+    if (v) { el.value = v; el.classList.remove('bad'); }
+    else { el.value = el.dataset.old; el.classList.add('bad'); setTimeout(() => el.classList.remove('bad'), 1500); }
+  });
   $('undoBtn').onclick = () => {
     if (!undo) return;
     const t = state.tasks.find(x => x.id === undo.id);
