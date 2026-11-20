@@ -54,7 +54,11 @@
   .wd b { display:block; font-size:15px; color:var(--txt); font-weight:600; }
   .wd.sel { border-color:var(--pri); }
   .wd.today b { color:var(--pri); }
-  .wd.over small { color:var(--warn); font-weight:600; }
+  .wd small { display:block; font-size:14px; line-height:1.25; color:var(--txt); margin-top:1px; }
+  .wd small.w { color:#27500A; }
+  .wd.over small.p { color:var(--warn); font-weight:600; }
+  .wlg { display:flex; gap:14px; font-size:12px; color:var(--mut); margin:6px 2px 0; }
+  .wlg b { font-weight:400; color:#27500A; }
   .meter { margin:10px 0 2px; }
   .meter .lbl { display:flex; justify-content:space-between; font-size:14px; color:var(--mut); margin-bottom:4px; }
   .bar { height:10px; border-radius:6px; background:var(--line); overflow:hidden; }
@@ -201,6 +205,7 @@
       <button class="sec" id="next">›</button>
     </div>
     <div class="week" id="week"></div>
+    <div class="wlg"><span>rând 1: planificat</span><b>rând 2: lucrat</b></div>
     <div class="meter">
       <div class="lbl"><span>Planificat (estimat)</span><span id="plannedTxt"></span></div>
       <div class="bar" id="plannedBar"><i></i></div>
@@ -550,11 +555,12 @@
     const w = $('week'); w.innerHTML = '';
     for (let i = 0; i < 7; i++) {
       const d = new Date(mon); d.setDate(mon.getDate() + i);
-      const k = ymd(d), p = plannedMin(k);
+      const k = ymd(d), p = plannedMin(k), wk = workedMin(k);
+      const hh = m => m ? (Math.round(m / 6) / 10) + 'h' : '–';
       const el = document.createElement('div');
       el.className = 'wd' + (k === curDay ? ' sel' : '') + (k === today ? ' today' : '') + (p >= limitMin() ? ' over' : '');
       el.dataset.d = k;
-      el.innerHTML = `${dayShort[d.getDay()]}<b>${d.getDate()}</b><small>${p ? (Math.round(p/6)/10) + 'h' : '–'}</small>`;
+      el.innerHTML = `${dayShort[d.getDay()]}<b>${d.getDate()}</b><small class="p">${hh(p)}</small><small class="w">${hh(wk)}</small>`;
       w.appendChild(el);
     }
   }
